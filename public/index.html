@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Summit Creative Group | CRM</title>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#070b12;--panel:#101726;--card:#162033;--inp:#0b101b;--blue:#2563eb;--cyan:#38bdf8;--gold:#f59e0b;--tx:#f1f5f9;--mut:#94a3b8;--bd:#283754;--ok:#10b981;--bad:#ef4444}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+body{background:var(--bg);color:var(--tx);padding-bottom:80px;min-height:100vh}
+header{background:var(--panel);border-bottom:2px solid var(--blue);padding:10px 14px;position:sticky;top:env(safe-area-inset-top,0px);z-index:50;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:1rem;text-transform:uppercase;letter-spacing:.8px}h1 small{display:block;font-size:.62rem;color:var(--cyan)}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.t{font-weight:700}.s{font-size:.8rem;color:var(--mut)}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+@media(min-width:640px){.kpis{grid-template-columns:repeat(4,1fr)}.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}.kpi b{display:block;font-size:1.3rem;color:var(--cyan);margin-top:4px}
+.bar{background:var(--bg);height:9px;border-radius:5px;overflow:hidden;margin:3px 0 9px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan))}.bar i.g{background:var(--ok)}.bar i.y{background:var(--gold)}
+button,.btn{background:var(--blue);color:#fff;border:1px solid var(--cyan);padding:6px 11px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.b2{background:var(--card);border-color:var(--bd)}.bg{background:#b45309;border-color:#fbbf24}.bd{background:rgba(239,68,68,.15);border-color:var(--bad);color:#fca5a5}
+button:disabled{opacity:.3}
+input,select,textarea{width:100%;padding:8px 10px;margin-bottom:9px;background:var(--inp);border:1px solid var(--bd);border-radius:7px;color:var(--tx);font-size:.9rem}
+label{display:block;font-size:.7rem;text-transform:uppercase;color:var(--mut);margin-bottom:3px;font-weight:700}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}
+.pill{font-size:.68rem;background:var(--bg);color:var(--cyan);border:1px solid var(--bd);padding:2px 7px;border-radius:4px;margin:2px 2px 0 0;display:inline-block}
+.badge{font-size:.68rem;padding:3px 8px;border-radius:6px;font-weight:700;border:1px solid var(--blue);background:rgba(37,99,235,.25);color:#93c5fd}.badge.r{border-color:var(--bad);background:rgba(239,68,68,.2);color:#fca5a5}.badge.o{border-color:var(--ok);background:rgba(16,185,129,.2);color:#6ee7b7}
+.kan{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px}
+.col{min-width:270px;max-width:270px;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px}.col.over{border:2px dashed var(--cyan)}
+.col h3{font-size:.8rem;text-transform:uppercase;color:var(--cyan);display:flex;justify-content:space-between;margin-bottom:8px}
+.kc{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:8px;cursor:grab}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--bd);display:flex;padding:5px 2px calc(5px + env(safe-area-inset-bottom,0px));z-index:50}
+nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;color:var(--mut);cursor:pointer;padding:4px 0;border-radius:6px}nav div.on{color:var(--cyan);background:rgba(56,189,248,.1)}nav span{display:block;font-size:1.1rem}
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;overflow-y:auto;padding:14px}
+#mbox{background:var(--panel);border:1px solid var(--cyan);border-radius:12px;max-width:580px;margin:10px auto;padding:16px}
+.chk{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--inp);padding:9px;border-radius:7px;margin-bottom:9px;border:1px solid var(--bd)}.chk label{display:flex;gap:6px;align-items:center;text-transform:none;font-weight:400;font-size:.82rem;color:var(--tx);margin:0}.chk input{width:auto;margin:0}
+.li{display:grid;grid-template-columns:24px 1fr 90px;gap:8px;align-items:center;margin-bottom:6px;font-size:.85rem}.li input{margin:0}
+@media print{body>*:not(#modal){display:none!important}#modal{position:static;background:#fff;padding:0}#mbox{border:0;background:#fff;color:#000;max-width:100%}#mbox *{color:#000!important;background:#fff!important;border-color:#999!important}.np{display:none!important}}
+</style></head><body>
+<div id="loginScreen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px">
+ <div style="width:100%;max-width:340px">
+  <h1 style="text-align:center;margin-bottom:4px">Summit Creative<small style="display:block;text-align:center;font-size:.62rem;color:var(--cyan);margin-top:4px">Command CRM • Boise, ID</small></h1>
+  <div class="card" style="margin-top:20px">
+   <label>Username</label><input id="loginUser" autocomplete="username" autocapitalize="off">
+   <label>Password</label><input id="loginPass" type="password" autocomplete="current-password">
+   <div id="loginErr" class="s" style="color:var(--bad);margin-bottom:9px;min-height:1em"></div>
+   <button id="loginBtn" style="width:100%">Sign in</button>
+  </div>
+ </div>
+</div>
+<div id="app" style="display:none">
+<header><h1>Summit Creative<small>Command CRM • Boise, ID</small></h1>
+<div style="display:flex;gap:6px;align-items:center"><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" data-a="search">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
+<div class="wrap" id="main"></div>
+<nav id="nav"></nav>
+<div id="modal"><div id="mbox"></div></div>
+</div>
+<script>
+/* ===== Data & storage: shared via db capability, falls back to localStorage ===== */
+const KEY='summit_crm_v4', uid=()=>Math.random().toString(36).slice(2,10), $=n=>'$'+Math.round(n||0).toLocaleString();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SRV=['SEO','AEO','GEO','CTV','Social Media','Podcasts','Logo Design','Live Events'];
+const DEF=()=>({users:[{id:'u1',name:'Alex',role:'Managing Partner'},{id:'u2',name:'Sarah',role:'Account Executive'},{id:'u3',name:'Jordan',role:'Events & Media'}],
+ cfg:{rates:{SEO:1200,AEO:850,GEO:850,CTV:2200,'Social Media':950,Podcasts:900,'Logo Design':750,'Live Events':2500},
+  stages:['Qualification','Audit & Discovery','Proposal / Pitch','Negotiation','Closed Won','Closed Lost'],
+  disps:['New Lead','Attempted Contact','Contacted','Discovery Scheduled','Proposal Sent','Converted','Lost'],
+  onboard:['Signed retainer & deposit collected','Kickoff & strategy call scheduled','Website, GBP & analytics access granted','Logo & brand assets uploaded','30-day launch roadmap delivered']},
+ leads:[],deals:[],acts:[],accts:[],invoices:[],recur:[],log:[],audit:[],deliv:[],props:[],tasks:[],files:[],templates:[
+ {id:'t1',name:'Intro follow-up',subject:'Great connecting, {{contact}}',body:`Hi {{contact}},
+
+Thanks for taking the time to talk about {{client}}. I'd love to share how Summit Creative can help grow your visibility in the Treasure Valley. Would a quick call this week work?
+
+{{rep}}
+Summit Creative Group`},
+ {id:'t2',name:'Proposal sent',subject:'Your Summit Creative proposal',body:`Hi {{contact}},
+
+Attached is the proposal for {{client}}. Happy to walk through it and adjust the scope. What day works for a short review?
+
+{{rep}}
+Summit Creative Group`},
+ {id:'t3',name:'Invoice due',subject:'Invoice {{invoice}} from Summit Creative',body:`Hi {{contact}},
+
+Your invoice {{invoice}} for {{amount}} is due {{due}}. Please let me know if you have any questions.
+
+Thank you,
+{{rep}}
+Summit Creative Group`},
+ {id:'t4',name:'Overdue notice',subject:'Reminder: invoice {{invoice}} is past due',body:`Hi {{contact}},
+
+A friendly reminder that invoice {{invoice}} ({{amount}}) was due {{due}} and is still open. If it has already been sent, thank you and please disregard.
+
+{{rep}}
+Summit Creative Group`},
+ {id:'t5',name:'Welcome / onboarding',subject:'Welcome to Summit Creative, {{client}}!',body:`Hi {{contact}},
+
+Welcome aboard! We're excited to get started. Here is where your onboarding stands:
+
+{{extra}}
+
+{{rep}}
+Summit Creative Group`},
+ {id:'t6',name:'Monthly update',subject:'Your monthly update from Summit Creative',body:`Hi {{contact}},
+
+Here is your monthly snapshot for {{client}}:
+
+{{extra}}
+
+{{rep}}
+Summit Creative Group`}]});
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0;
+const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files'];
+const el=id=>document.getElementById(id);
+function merge(d){KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]})}
+
+/* ===== Auth + REST persistence (replaces the old claude.ai db capability) ===== */
+let TOKEN=null,MYID=null,MYNAME=null,IS_ADMIN=false;
+const api=async(path,opts={})=>{const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{}),...(opts.headers||{})}});
+ if(r.status===401){doLogout();throw new Error('Session expired')}return r};
+function doLogout(){TOKEN=null;try{localStorage.removeItem('summit_token')}catch(e){}el('app').style.display='none';el('loginScreen').style.display='flex';el('loginPass').value=''}
+async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').value;el('loginErr').textContent='';
+ if(!u||!p){el('loginErr').textContent='Enter a username and password.';return}
+ try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  const d=await r.json();if(!r.ok){el('loginErr').textContent=d.error||'Could not sign in.';return}
+  TOKEN=d.token;MYID=d.userId;IS_ADMIN=d.isAdmin;try{localStorage.setItem('summit_token',TOKEN)}catch(e){}
+  await boot()}catch(e){el('loginErr').textContent='Could not reach the server.'}}
+function save(...ks){lastLocal=Date.now();render();pushData()}
+async function pushData(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'}catch(e){if(TOKEN)el('sync').textContent='⚠ save failed'}}
+async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(Date.now()-lastLocal<4000)return;merge(d);el('sync').textContent='● shared';if(!quiet)render()}catch(e){}}
+async function boot(){
+ el('loginScreen').style.display='none';el('app').style.display='block';
+ MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
+ await pullData(true);
+ init();
+ setInterval(()=>pullData(false),10000);
+}
+(async()=>{
+ try{TOKEN=localStorage.getItem('summit_token')}catch(e){}
+ if(TOKEN){try{const payload=JSON.parse(atob(TOKEN.split('.')[1]));
+   if(payload.exp&&payload.exp*1000<Date.now())throw new Error('expired');
+   MYID=payload.userId;IS_ADMIN=payload.isAdmin;await boot()}catch(e){doLogout()}}
+ else{el('loginScreen').style.display='flex'}
+ el('loginBtn').onclick=doLogin;
+ el('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+})();
+/* ===== Helpers ===== */
+const uName=id=>(S.users.find(u=>u.id===id)||{name:'Unassigned'}).name;
+const rate=s=>Number(S.cfg.rates[s])||800, sum=a=>(a||[]).reduce((t,s)=>t+rate(s),0);
+const WON=()=>S.cfg.stages[S.cfg.stages.length-2], LOST=()=>S.cfg.stages[S.cfg.stages.length-1];
+const isOpen=d=>d.stage!==WON()&&d.stage!==LOST();
+const prob=st=>{const i=S.cfg.stages.indexOf(st),n=S.cfg.stages.length;return st===WON()?100:st===LOST()?0:Math.round(10+(i/(n-2))*80)};
+const mine=o=>el('who').value==='ALL'||o.owner===el('who').value;
+const optU=(sel)=>S.users.map(u=>`<option value="${u.id}" ${u.id===sel?'selected':''}>${esc(u.name)}</option>`).join('');
+const optL=(a,sel)=>a.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+const bar=(l,v,max,c='')=>`<div class="row s" style="color:var(--tx)"><span>${l}</span><b style="color:var(--cyan)">${v}</b></div><div class="bar"><i class="${c}" style="width:${max?Math.max(v&&6,Math.min(100,v/max*100)):0}%"></i></div>`;
+const dueNow=a=>!a.done&&new Date(a.dt)<=new Date();
+/* ===== Generic form modal ===== */
+function openModal(h){el('mbox').innerHTML=h;el('modal').style.display='block'}
+function closeM(){el('modal').style.display='none'}
+function form(title,fields,v,onSave){
+ let h=`<h3 style="margin-bottom:12px">${esc(title)}</h3>`;
+ fields.forEach(f=>{const val=v[f.k]??'';h+=`<label>${esc(f.l)}</label>`;
+  if(f.t==='sel')h+=`<select id="f_${f.k}">${f.o.map(o=>{const[a,b]=Array.isArray(o)?o:[o,o];return`<option value="${esc(a)}" ${a===val?'selected':''}>${esc(b)}</option>`}).join('')}</select>`;
+  else if(f.t==='area')h+=`<textarea id="f_${f.k}" rows="3">${esc(val)}</textarea>`;
+  else if(f.t==='srv')h+=`<div class="chk" id="f_${f.k}">${SRV.map(s=>`<label><input type="checkbox" value="${esc(s)}" ${(val||[]).includes(s)?'checked':''}>${esc(s)} (${$$(rate(s))})</label>`).join('')}</div>`;
+  else h+=`<input id="f_${f.k}" type="${f.t||'text'}" value="${esc(val)}" placeholder="${esc(f.p||'')}">`});
+ h+=`<div class="row"><button id="fsave" style="flex:1">Save</button><button class="b2" data-a="close">Cancel</button></div>`;
+ openModal(h);
+ el('fsave').onclick=()=>{const o={};fields.forEach(f=>{const e=el('f_'+f.k);o[f.k]=f.t==='srv'?[...e.querySelectorAll('input:checked')].map(i=>i.value):f.t==='number'?Number(e.value)||0:e.value.trim()});{const lbl=title+': '+(o.company||o.name||o.title||o.client||'');if(onSave(o)!==false){aud(lbl);save('audit');closeM()}}}}
+const $$=n=>Math.round(n).toLocaleString();
+/* ===== Views ===== */
+const TABS=[['dash','📊','Analytics'],['leads','🎯','Leads'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
+function init(){el('nav').innerHTML=TABS.map(t=>`<div data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');render();runRecurring()}
+function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdue();
+ const w=el('who'),cur=w.value||'ALL';w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';
+ if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
+ el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
+ const v={dash:vDash,leads:vLeads,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
+function vDash(){
+ const D=S.deals.filter(mine),open=D.filter(isOpen),pipe=open.reduce((t,d)=>t+d.amount,0),wtd=open.reduce((t,d)=>t+d.amount*prob(d.stage)/100,0);
+ const won=D.filter(d=>d.stage===WON()).reduce((t,d)=>t+d.amount,0),A=S.acts.filter(a=>!a.done&&mine(a)),od=A.filter(dueNow).length;
+ const stMax=Math.max(1,...S.cfg.stages.map(s=>D.filter(d=>d.stage===s).reduce((t,d)=>t+d.amount,0)));
+ const cnt={};[...S.leads.filter(mine),...D].forEach(x=>(x.services||[]).forEach(s=>cnt[s]=(cnt[s]||0)+1));const cm=Math.max(1,...Object.values(cnt));
+ const uv=S.users.map(u=>({u,v:S.deals.filter(d=>d.owner===u.id&&isOpen(d)).reduce((t,d)=>t+d.amount,0)})),um=Math.max(1,...uv.map(x=>x.v));
+ const unpaid=S.invoices.filter(i=>!i.paid).reduce((t,i)=>t+i.amount,0);
+ return`<div class="row" style="margin-bottom:12px"><h2>Executive Command</h2><div><button data-a="newLead">+ Lead</button> <button class="bg" data-a="prop" data-id="blank">📄 Blank Quote</button></div></div>
+ <div class="kpis"><div class="kpi">Open Pipeline<b>${$(pipe)}</b></div><div class="kpi">Weighted<b>${$(wtd)}</b></div><div class="kpi">Won<b style="color:var(--ok)">${$(won)}</b></div><div class="kpi">Open Tasks<b style="color:var(--gold)">${A.length}${od?` <small style="color:#f87171">(${od} due)</small>`:''}</b></div></div>
+ <div class="g2"><div class="card"><div class="t">Pipeline by Stage</div>${S.cfg.stages.map(s=>{const l=D.filter(d=>d.stage===s);return bar(`${esc(s)} (${l.length})`,$(l.reduce((t,d)=>t+d.amount,0)),1,s===WON()?'g':s===LOST()?'y':'').replace(/width:[^"]*/,`width:${Math.max(l.length?6:0,l.reduce((t,d)=>t+d.amount,0)/stMax*100)}%`)}).join('')}</div>
+ <div class="card"><div class="t">Service Demand</div>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([s,c])=>bar(esc(s),c,cm)).join('')||'<p class="s">Tag services on leads or deals.</p>'}</div></div>
+ <div class="card"><div class="t">Team Leaderboard</div>${uv.map(x=>bar(`${esc(x.u.name)} <span class="s">${esc(x.u.role)}</span>`,$(x.v),1,'y').replace(/width:[^"]*/,`width:${Math.max(x.v?5:0,x.v/um*100)}%`)).join('')}<div class="s">Unpaid invoices: <b style="color:var(--gold)">${$(unpaid)}</b></div></div>`}
+function vLeads(){
+ const q=(window._lq||'').toLowerCase(),L=S.leads.filter(l=>mine(l)&&(!q||(l.company+l.contact+l.services.join()).toLowerCase().includes(q)));
+ return`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button data-a="newLead">+ New Lead</button></div></div>
+ <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`+(L.map(l=>`<div class="card"><div class="row"><div><div class="t">${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
+ <div class="row" style="margin-top:8px"><div style="flex:1"><label>Status</label><select data-c="ldisp" data-id="${l.id}">${optL(S.cfg.disps,l.disposition)}</select></div><div style="flex:1"><label>Owner</label><select data-c="lown" data-id="${l.id}">${optU(l.owner)}</select></div></div>
+ ${l.notes?`<p class="s" style="margin-top:6px">📝 ${esc(l.notes)}</p>`:''}<div>${l.services.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
+ <div class="acts"><button class="bg" data-a="prop" data-id="L${l.id}">📄 Quote</button><button data-a="convert" data-id="${l.id}">🚀 To Deal</button>${l.phone?`<a class="btn b2" href="tel:${esc(l.phone)}">📞</a>`:''}${l.email?`<a class="btn b2" href="mailto:${esc(l.email)}">✉️</a>`:''}<button class="b2" data-a="follow" data-id="${l.id}">📅 Follow-up</button><button class="b2" data-a="emailLead" data-id="${l.id}">✉️ Email</button><button class="b2" data-a="hist" data-id="L${l.id}">🕒</button><button class="b2" data-a="files" data-id="L${l.id}">📎</button><button class="b2" data-a="editLead" data-id="${l.id}">✏️</button><button class="bd" data-a="delLead" data-id="${l.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No leads.</div>')}
+function vDeals(){
+ const D=S.deals.filter(mine);
+ const head=`<div class="row" style="margin-bottom:10px"><h2>Deals</h2><div><button class="b2" data-a="mode">${dealMode==='kan'?'📋 List':'📊 Board'}</button> <button class="b2" data-a="props">📑 Proposals</button> <button class="b2" data-a="csv" data-id="deals">⬇ CSV</button> <button data-a="newDeal">+ Deal</button></div></div>`;
+ const card=d=>{const i=S.cfg.stages.indexOf(d.stage);return`<div class="kc" draggable="true" data-drag="${d.id}"><div class="row"><div class="t" style="font-size:.9rem">${esc(d.name)}</div><span class="badge ${d.stage===WON()?'o':''}">${$(d.amount)}</span></div><div class="s">🏢 ${esc(d.account)}</div><div class="s">👤 ${esc(uName(d.owner))} • 🎯 ${prob(d.stage)}%${d.close?' • '+esc(d.close):''}</div><div>${(d.services||[]).map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
+ <div class="acts"><button class="b2" ${i<1?'disabled':''} data-a="mv" data-id="${d.id}" data-d="-1">◀</button><button class="bg" data-a="prop" data-id="D${d.id}">📄</button><button class="b2" data-a="hist" data-id="D${d.id}">🕒</button><button class="b2" data-a="editDeal" data-id="${d.id}">✏️</button><button class="bd" data-a="delDeal" data-id="${d.id}">🗑️</button><button class="b2" ${i>=S.cfg.stages.length-1?'disabled':''} data-a="mv" data-id="${d.id}" data-d="1">▶</button></div></div>`};
+ if(dealMode==='list')return head+(D.map(card).join('')||'<div class="card s">No deals.</div>');
+ return head+`<p class="s" style="margin-bottom:8px">Drag cards between columns, or use ◀ ▶. Moving a deal to <b>${esc(WON())}</b> auto-creates the client account + onboarding checklist.</p><div class="kan">`+S.cfg.stages.map(st=>{const l=D.filter(d=>d.stage===st);return`<div class="col" data-stage="${esc(st)}"><h3><span>${esc(st)} (${l.length})</span><span style="color:var(--gold)">${$(l.reduce((t,d)=>t+d.amount,0))}</span></h3>${l.map(card).join('')||'<div class="s" style="text-align:center;padding:24px;border:1px dashed var(--bd);border-radius:8px">Drop here</div>'}</div>`}).join('')+'</div>'}
+function vCal(){
+ const A=S.acts.filter(mine).sort((a,b)=>new Date(a.dt)-new Date(b.dt));
+ return`<div class="row" style="margin-bottom:10px"><h2>Shared Calendar</h2><button data-a="newAct">+ Schedule</button></div>`+(A.map(a=>{const late=dueNow(a);return`<div class="card" style="${a.done?'opacity:.5':''}"><div class="row"><div><div class="t" style="${a.done?'text-decoration:line-through':''}">${esc(a.title)}</div><div class="s">🏢 ${esc(a.client)} • 👤 ${esc(uName(a.owner))}</div></div><span class="badge ${late&&!a.done?'r':''}">${esc(a.type)}${late&&!a.done?' • OVERDUE':''}</span></div><div class="s" style="color:var(--cyan);margin:6px 0">🕒 ${esc(a.dt.replace('T',' at '))} ${a.pri==='High'?'🔥':''}</div><button class="b2" data-a="actDone" data-id="${a.id}">${a.done?'↩ Reopen':'✅ Complete'}</button> <button class="bd" data-a="delAct" data-id="${a.id}">🗑️</button></div>`}).join('')||'<div class="card s">Nothing scheduled.</div>')}
+function vClients(){
+ return`<div class="row" style="margin-bottom:10px"><h2>Clients & Onboarding</h2><button data-a="newAcct">+ Client</button></div>`+(S.accts.filter(mine).map(a=>{const n=a.steps.length,d=a.steps.filter(s=>s.done).length,p=n?Math.round(d/n*100):0;
+ return`<div class="card"><div class="row"><div><div class="t">${esc(a.name)}</div><div class="s">👤 ${esc(a.contact||'—')} • 📞 ${esc(a.phone||'—')} • ${esc(uName(a.owner))}</div></div><span class="badge o">${$(a.retainer)}/mo${a.renewal?' • renews '+esc(a.renewal):''}${a.status==='Churned'?' • CHURNED':''}</span></div>
+ <div class="row s" style="margin-top:8px;color:var(--cyan)"><b>Onboarding ${d}/${n}</b><b>${p}%</b></div><div class="bar"><i class="g" style="width:${p}%"></i></div>
+ ${a.steps.map(s=>`<div class="row" style="align-items:center;padding:4px 0"><label style="display:flex;gap:8px;text-transform:none;font-size:.84rem;color:var(--tx);margin:0;font-weight:400;${s.done?'text-decoration:line-through;opacity:.6':''}"><input type="checkbox" style="width:auto;margin:0" ${s.done?'checked':''} data-c="step" data-id="${a.id}" data-s="${s.id}">${esc(s.text)}</label><button class="bd" data-a="delStep" data-id="${a.id}" data-s="${s.id}">✕</button></div>`).join('')}
+ <div class="acts"><input id="ns_${a.id}" placeholder="Add step…" style="margin:0;flex:1"><button data-a="addStep" data-id="${a.id}">+ Step</button><button class="bg" data-a="newInv" data-id="${a.id}">🧾 Invoice</button><button class="b2" data-a="newRecur" data-id="${a.id}">🔁 Recurring</button><button class="b2" data-a="portal" data-id="${a.id}">🌐 Portal</button><button class="b2" data-a="emailAcct" data-id="${a.id}">✉️</button><button class="b2" data-a="hist" data-id="C${a.id}">🕒</button><button class="b2" data-a="deliv" data-id="${a.id}">📦</button><button class="b2" data-a="files" data-id="C${a.id}">📎</button><button class="b2" data-a="editAcct" data-id="${a.id}">✏️</button><button class="bd" data-a="delAcct" data-id="${a.id}">🗑️</button></div></div>`}).join('')||'<div class="card s">No clients yet. Win a deal or add one.</div>')}
+function vInv(){return recurCard()+vInv0()}
+function vInv0(){
+ const I=S.invoices.slice().sort((a,b)=>b.num-a.num);
+ return`<div class="row" style="margin-bottom:10px"><h2>Invoices</h2><div><button class="b2" data-a="csv" data-id="invoices">⬇ CSV</button> <button data-a="newInv">+ Invoice</button></div></div>`+(I.map(i=>{const late=!i.paid&&i.due&&new Date(i.due)<new Date();return`<div class="card"><div class="row"><div><div class="t">INV-${i.num} • ${esc(i.client)}</div><div class="s">${esc(i.desc)} • due ${esc(i.due||'—')}</div></div><div><b>${$(i.amount)}</b> <span class="badge ${i.paid?'o':late?'r':''}">${i.paid?'PAID':late?'OVERDUE':'UNPAID'}</span></div></div><div class="acts"><button class="b2" data-a="paid" data-id="${i.id}">${i.paid?'↩ Mark unpaid':'✅ Mark paid'}</button><button class="bg" data-a="showInv" data-id="${i.id}">🖨 View / Print</button><button class="b2" data-a="emailInv" data-id="${i.id}">✉️ Email</button><button class="bd" data-a="delInv" data-id="${i.id}">🗑️</button></div></div>`}).join('')||'<div class="card s">No invoices yet.</div>')}
+function vSet(){
+ return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
+ <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button></div>
+ <div class="card"><div class="t">Service Rate Card ($/mo)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}"></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
+ <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
+ ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
+/* ===== Actions ===== */
+const owners=()=>S.users.map(u=>[u.id,u.name]);
+const A={
+ tab(id){tab=id;render();scrollTo(0,0)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
+ alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${esc(uName(a.owner))} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
+ newLead(){A.editLead()},
+ editLead(id){const l=S.leads.find(x=>x.id===id)||{owner:S.users[0]?.id,disposition:S.cfg.disps[0],services:[]};
+  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
+ delLead(id){if(confirm('Delete lead?')){S.leads=S.leads.filter(l=>l.id!==id);save('leads')}},
+ convert(id){const l=S.leads.find(x=>x.id===id);if(!l)return;
+  S.deals.unshift({id:uid(),name:`${l.company} – ${l.services.slice(0,2).join(' & ')||'Marketing'}`,source:l.source||'Unknown',account:l.company,email:l.email,phone:l.phone,contact:l.contact,owner:l.owner,stage:S.cfg.stages[0],amount:l.value||sum(l.services)||2500,close:new Date(Date.now()+12096e5).toISOString().slice(0,10),services:[...l.services]});
+  l.disposition='Converted';if(!S.cfg.disps.includes('Converted'))l.disposition=S.cfg.disps[S.cfg.disps.length-2]||l.disposition;save('leads','deals');tab='deals';render()},
+ newDeal(){A.editDeal()},
+ editDeal(id){const d=S.deals.find(x=>x.id===id)||{owner:S.users[0]?.id,stage:S.cfg.stages[0],services:[]};
+  form(id?'Edit Deal':'New Deal',[{k:'name',l:'Deal name'},{k:'account',l:'Client'},{k:'email',l:'Client email',t:'email'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'stage',l:'Stage',t:'sel',o:S.cfg.stages},{k:'amount',l:'Amount (0 = auto)',t:'number'},{k:'close',l:'Expected close',t:'date'},{k:'services',l:'Services',t:'srv'}],d,o=>{if(!o.name)return alert('Name required')&&false;o.amount=o.amount||sum(o.services);o.account=o.account||o.name;if(id)Object.assign(d,o);else{Object.assign(d,o,{id:uid()});S.deals.unshift(d)}wonCheck(d);save('deals','accts')})},
+ delDeal(id){if(confirm('Delete deal?')){S.deals=S.deals.filter(d=>d.id!==id);save('deals')}},
+ mv(id,el_){const d=S.deals.find(x=>x.id===id),i=S.cfg.stages.indexOf(d.stage)+Number(el_.dataset.d);if(S.cfg.stages[i]){d.stage=S.cfg.stages[i];const w=d.stage===WON();wonCheck(d);if(w)slackNotify('🏆 Deal WON: *'+d.name+'* ('+$(d.amount)+'/mo) — '+uName(d.owner));save('deals','accts')}},
+ newAct(){A.follow()},
+ follow(id){const l=S.leads.find(x=>x.id===id);form('Schedule',[{k:'type',l:'Type',t:'sel',o:['Meeting','Follow-Up','Call']},{k:'title',l:'Title'},{k:'client',l:'Lead / client'},{k:'owner',l:'Calendar',t:'sel',o:owners()},{k:'dt',l:'Date & time',t:'datetime-local'},{k:'pri',l:'Priority',t:'sel',o:['High','Normal']}],l?{type:'Follow-Up',title:'Follow up with '+l.company,client:l.company,owner:l.owner,pri:'Normal'}:{type:'Meeting',pri:'Normal',owner:S.users[0]?.id},o=>{if(!o.title||!o.dt)return alert('Title and date required')&&false;S.acts.unshift({id:uid(),...o,client:o.client||'General',done:false});save('acts')})},
+ actDone(id){const a=S.acts.find(x=>x.id===id);a.done=!a.done;save('acts')},delAct(id){S.acts=S.acts.filter(a=>a.id!==id);save('acts')},
+ newAcct(){form('New Client',[{k:'name',l:'Business name'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'owner',l:'Account manager',t:'sel',o:owners()},{k:'retainer',l:'Monthly retainer ($)',t:'number'}],{owner:S.users[0]?.id},o=>{if(!o.name)return alert('Name required')&&false;S.accts.unshift(mkAcct(o));save('accts')})},
+ step(id,e){const a=S.accts.find(x=>x.id===id),s=a.steps.find(x=>x.id===e.dataset.s);s.done=e.checked;save('accts')},
+ delStep(id,e){const a=S.accts.find(x=>x.id===id);a.steps=a.steps.filter(s=>s.id!==e.dataset.s);save('accts')},
+ addStep(id){const i=el('ns_'+id),t=i.value.trim();if(!t)return;S.accts.find(x=>x.id===id).steps.push({id:uid(),text:t,done:false});save('accts')},
+ delAcct(id){if(confirm('Delete client?')){S.accts=S.accts.filter(a=>a.id!==id);save('accts')}},
+ newInv(id){const a=S.accts.find(x=>x.id===id);form('New Invoice',[{k:'client',l:'Client'},{k:'desc',l:'Description'},{k:'amount',l:'Amount ($)',t:'number'},{k:'due',l:'Due date',t:'date'}],a?{client:a.name,desc:'Monthly retainer – '+new Date().toLocaleString('en-US',{month:'long',year:'numeric'}),amount:a.retainer,due:new Date(Date.now()+12096e5).toISOString().slice(0,10)}:{},o=>{if(!o.client||!o.amount)return alert('Client and amount required')&&false;S.invoices.push({id:uid(),num:1001+S.invoices.length,...o,date:new Date().toLocaleDateString(),paid:false});save('invoices');tab='inv';render()})},
+ paid(id){const i=S.invoices.find(x=>x.id===id);i.paid=!i.paid;save('invoices')},
+ flagOverdue(){S.invoices.filter(i=>!i.paid&&i.due&&i.due<today()&&!i.overdueFlagged).forEach(i=>{i.overdueFlagged=true;slackNotify('⚠️ Invoice overdue: INV-'+i.num+' • '+i.client+' • '+$(i.amount)+' (was due '+i.due+')')})},delInv(id){if(confirm('Delete invoice?')){S.invoices=S.invoices.filter(i=>i.id!==id);save('invoices')}},
+ showInv(id){const i=S.invoices.find(x=>x.id===id);openModal(`<div class="row"><div><h3>Summit Creative Group, LLC</h3><div class="s">Boise, Idaho</div></div><div class="s">INVOICE <b>INV-${i.num}</b><br>Date: ${esc(i.date)}<br>Due: ${esc(i.due||'—')}</div></div><hr style="margin:12px 0;border-color:#283754"><p class="s">Bill to</p><p class="t">${esc(i.client)}</p><p style="margin:12px 0">${esc(i.desc)}</p><h2>Total due: ${$(i.amount)} ${i.paid?'(PAID)':''}</h2><p class="s" style="margin-top:10px">Thank you for partnering with Summit Creative Group!</p><div class="acts np"><button onclick="print()">🖨 Print / Save PDF</button><button class="b2" data-a="close">Close</button></div>`)},
+ prop(id){propOpen(id)},
+ addUser(){const n=el('nu').value.trim();if(!n)return;S.users.push({id:uid(),name:n,role:el('nr').value.trim()||'Team Member'});save('users')},
+ logout(){doLogout()},
+ async createLogin(id){const u=S.users.find(x=>x.id===id);if(!u)return;
+  const username=(prompt('Username for '+u.name+':',u.name.toLowerCase().replace(/[^a-z0-9]/g,''))||'').trim();if(!username)return;
+  const password=prompt('Temporary password (min 8 characters) — share this with '+u.name+', they can change it from Settings:')||'';if(password.length<8)return alert('Password must be at least 8 characters.');
+  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id})});const d=await r.json();
+   if(!r.ok)return alert(d.error||'Could not create login.');
+   alert('Login created. Username: '+username+'  Password: '+password)}catch(e){alert('Could not reach the server.')}},
+ async changePw(){const oldPassword=el('pwOld').value,newPassword=el('pwNew').value;el('pwErr').textContent='';
+  if(!oldPassword||newPassword.length<8){el('pwErr').textContent='Enter your current password and a new one of at least 8 characters.';return}
+  try{const r=await api('/api/me/password',{method:'POST',body:JSON.stringify({oldPassword,newPassword})});const d=await r.json();
+   if(!r.ok){el('pwErr').textContent=d.error||'Could not change password.';return}
+   alert('Password changed.');render()}catch(e){el('pwErr').textContent='Could not reach the server.'}},
+ delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users')},
+ saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);save('cfg');alert('Rates saved')},
+ saveLists(){const p=i=>el(i).value.split(',').map(s=>s.trim()).filter(Boolean),st=p('sst');if(st.length<3)return alert('Need at least 3 stages (…, Won, Lost).');S.cfg.stages=st;S.cfg.disps=p('sdp');S.cfg.onboard=p('sob');save('cfg');alert('Saved')},
+ reset(){if(confirm('Reset ALL CRM data for everyone?')){S=DEF();save()}},
+ csv(kind){let rows,name=kind;
+  if(kind==='backup'){return doDownload('summit_crm_backup.json',JSON.stringify(S,null,2))}
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  if(kind==='leads')rows=[['Company','Contact','Phone','Email','Owner','Status','Value','Services']].concat(S.leads.map(l=>[l.company,l.contact,l.phone,l.email,uName(l.owner),l.disposition,l.value,l.services.join('; ')]));
+  if(kind==='deals')rows=[['Deal','Client','Owner','Stage','Amount','Prob%','Close','Services']].concat(S.deals.map(d=>[d.name,d.account,uName(d.owner),d.stage,d.amount,prob(d.stage),d.close,(d.services||[]).join('; ')]));
+  if(kind==='invoices')rows=[['Invoice','Client','Description','Amount','Date','Due','Paid']].concat(S.invoices.map(i=>['INV-'+i.num,i.client,i.desc,i.amount,i.date,i.due,i.paid?'Yes':'No']));
+  doDownload(`summit_${name}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'))}
+};
+function mkAcct(o){return{id:uid(),status:'Active',created:today(),name:o.name,contact:o.contact||'',phone:o.phone||'',owner:o.owner,retainer:o.retainer||0,steps:S.cfg.onboard.map(t=>({id:uid(),text:t,done:false}))}}
+function wonCheck(d){lostCheck(d);if(d.lastStage!==d.stage){if(d.lastStage)logEv('D'+d.id,'Stage → '+d.stage);d.lastStage=d.stage}if(d.stage===WON()&&!S.accts.some(a=>a.dealId===d.id)){const a=mkAcct({name:d.account,contact:d.contact,phone:d.phone,owner:d.owner,retainer:d.amount});a.dealId=d.id;S.accts.unshift(a)}}
+async function doDownload(f,data){if(dl){try{await dl.save({filename:f,data});return}catch(e){if(e&&e.code==='declined')return}}
+ const u=URL.createObjectURL(new Blob([data]));const a=document.createElement('a');a.href=u;a.download=f;a.click()}
+/* ===== Proposal generator ===== */
+function propOpen(id){let name='',email='',owner=S.users[0]?.id,sel=[],notes='Summit Creative Group, LLC will provide full-service campaign execution, transparent monthly reporting, and dedicated Treasure Valley account management.';
+ if(id[0]==='L'){const l=S.leads.find(x=>x.id===id.slice(1));if(l){name=l.company;email=l.email;owner=l.owner;sel=l.services}}
+ if(id[0]==='D'){const d=S.deals.find(x=>x.id===id.slice(1));if(d){name=d.account;email=d.email;owner=d.owner;sel=d.services||[]}}
+ openModal(`<div class="row"><h3>Summit Creative Group, LLC</h3><div class="s">Quote #SCG-${Math.floor(1000+Math.random()*9000)}<br>${new Date().toLocaleDateString()}</div></div>
+ <label style="margin-top:10px">Prepared for</label><input id="pn" value="${esc(name)}"><label>Client email</label><input id="pe" value="${esc(email)}"><label>Prepared by</label><input id="po" value="${esc(uName(owner))}">
+ <label>Services (check + edit price)</label>${SRV.map(s=>`<div class="li"><input type="checkbox" class="pc" data-s="${esc(s)}" ${sel.includes(s)?'checked':''}><span>${esc(s)}</span><input type="number" class="pr" value="${rate(s)}"></div>`).join('')}
+ <div class="row"><div style="flex:1"><label>One-time setup ($)</label><input id="ps" type="number" value="0"></div><div style="flex:1"><label>Discount ($)</label><input id="pd" type="number" value="0"></div></div>
+ <label>Scope</label><textarea id="pt" rows="3">${esc(notes)}</textarea><h3 id="ptot" style="text-align:right"></h3>
+ <div class="acts np"><button onclick="print()">🖨 Print / PDF</button><button class="bg" id="pmail">📧 Email</button><button class="b2" id="pcopy">📋 Copy</button><button class="bg" id="psave">💾 Save proposal</button><button class="b2" data-a="close">Close</button></div>`);
+ const calc=()=>{let m=0;const items=[];document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const p=Number(document.querySelectorAll('.pr')[i].value)||0;m+=p;items.push(`• ${c.dataset.s}: ${$(p)}/mo`)}});
+  const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0,tot=Math.max(0,m+setup-disc);el('ptot').textContent=`Monthly ${$(m)} • Total investment ${$(tot)}`;
+  return`SUMMIT CREATIVE GROUP, LLC — PROPOSAL\nPrepared for: ${el('pn').value}\nPrepared by: ${el('po').value}\n\n${items.join('\n')||'• Custom package'}\n${setup?`• One-time setup: ${$(setup)}\n`:''}${disc?`• Discount: -${$(disc)}\n`:''}\nTOTAL INVESTMENT: ${$(tot)}\n\n${el('pt').value}`};
+ el('mbox').oninput=calc;calc();
+ el('pmail').onclick=()=>{location.href=`mailto:${el('pe').value}?subject=${encodeURIComponent('Summit Creative Group Proposal – '+el('pn').value)}&body=${encodeURIComponent(calc())}`};
+ el('psave').onclick=()=>{const items=[];let m=0;document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const pr=Number(document.querySelectorAll('.pr')[i].value)||0;m+=pr;items.push({s:c.dataset.s,p:pr})}});const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0;
+ const rec={id:uid(),num:Math.max(2000,...S.props.map(x=>x.num))+1,client:el('pn').value,email:el('pe').value,dealId:id[0]==='D'?id.slice(1):'',items,setup,disc,monthly:m,total:Math.max(0,m+setup-disc),notes:el('pt').value,status:'Draft',date:today(),owner:(S.users.find(u=>u.name===el('po').value)||{}).id};
+ S.props.unshift(rec);if(rec.dealId)logEv('D'+rec.dealId,'Proposal '+rec.num+' saved ('+$(m)+'/mo)');save('props');alert('Saved as proposal '+rec.num)};el('pcopy').onclick=()=>navigator.clipboard.writeText(calc()).then(()=>alert('Copied'),()=>alert('Copy blocked by browser'))}
+
+/* ===== Email templates, recurring invoices, client portal ===== */
+const NL=String.fromCharCode(10), today=()=>new Date().toISOString().slice(0,10);
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const addMonth=(d,day)=>{let[y,m]=d.split('-').map(Number);m++;if(m>12){m=1;y++}return y+'-'+String(m).padStart(2,'0')+'-'+String(Math.min(28,Number(day)||1)).padStart(2,'0')};
+function tplCard(){return`<div class="card"><div class="row"><div class="t">Email Templates</div><button data-a="editTpl">+ Template</button></div><p class="s" style="margin:6px 0">Merge fields: {{client}} {{contact}} {{rep}} {{amount}} {{invoice}} {{due}} {{extra}}</p>${S.templates.map(t=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(t.name)}</b><div class="s">${esc(t.subject)}</div></div><div><button class="b2" data-a="editTpl" data-id="${t.id}">✏️</button> <button class="bd" data-a="delTpl" data-id="${t.id}">🗑️</button></div></div>`).join('')||'<p class="s">No templates.</p>'}</div>`}
+function recurCard(){return`<div class="card"><div class="row"><div class="t">🔁 Recurring Invoices</div><button data-a="newRecur">+ Recurring</button></div><p class="s" style="margin:6px 0">Invoices are generated automatically (monthly) the next time anyone opens the CRM on or after the date.</p>${S.recur.map(r=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(r.client)}</b> • ${$(r.amount)}/mo<div class="s">${esc(r.desc)} • next ${esc(r.next)} ${r.active?'':'(paused)'}</div></div><div><button class="b2" data-a="togRecur" data-id="${r.id}">${r.active?'⏸':'▶'}</button> <button class="bd" data-a="delRecur" data-id="${r.id}">🗑️</button></div></div>`).join('')||'<p class="s">None set up.</p>'}</div>`}
+function runRecurring(){let ch=false;const t=today();
+ S.recur.forEach(r=>{if(!r.active)return;let n=0;while(r.next<=t&&n++<12){const key=r.id+r.next;if(!S.invoices.some(i=>i.rkey===key))S.invoices.push({id:uid(),num:Math.max(1000,...S.invoices.map(i=>i.num))+1,client:r.client,desc:r.desc+' – '+r.next.slice(0,7),amount:r.amount,date:r.next,due:addDays(r.next,14),paid:false,rkey:key});r.next=addMonth(r.next,r.day);ch=true}});
+ if(ch)save('invoices','recur')}
+function portalText(a){const inv=S.invoices.filter(i=>i.client===a.name),acts=S.acts.filter(x=>x.client===a.name&&!x.done),d=a.steps.filter(s=>s.done).length;
+ return'Onboarding: '+d+'/'+a.steps.length+' steps complete'+NL+a.steps.map(s=>(s.done?'[x] ':'[ ] ')+s.text).join(NL)+NL+NL+'Invoices:'+NL+(inv.map(i=>'INV-'+i.num+' '+$(i.amount)+' – '+(i.paid?'PAID':'due '+(i.due||'—'))).join(NL)||'none')+NL+NL+'Upcoming:'+NL+(acts.map(x=>x.dt.replace('T',' ')+' – '+x.title).join(NL)||'nothing scheduled')}
+function emailOpen(c){const T=S.templates;if(!T.length)return alert('Add a template in Settings first.');
+ openModal(`<h3>✉️ Email</h3><label>Template</label><select id="et">${T.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('')}</select><label>To</label><input id="eto" value="${esc(c.email||'')}"><label>Subject</label><input id="esu"><label>Body</label><textarea id="eb" rows="10"></textarea><div class="acts np"><button id="emo">📧 Open in mail</button><button class="b2" id="ecp">📋 Copy</button><button class="b2" data-a="close">Close</button></div>`);
+ const mg=x=>String(x).replace(/\{\{(\w+)\}\}/g,(m,k)=>c[k]??(k==='extra'?'':m));
+ const fill=()=>{const t=T[el('et').value];el('esu').value=mg(t.subject);el('eb').value=mg(t.body)};
+ const i=T.findIndex(t=>t.name===c.tpl);if(i>=0)el('et').value=i;el('et').onchange=fill;fill();
+ el('emo').onclick=()=>{if(c.ref){logEv(c.ref,'Emailed: '+el('esu').value);save('log')}location.href='mailto:'+el('eto').value+'?subject='+encodeURIComponent(el('esu').value)+'&body='+encodeURIComponent(el('eb').value)};
+ el('ecp').onclick=()=>navigator.clipboard.writeText(el('esu').value+NL+NL+el('eb').value).then(()=>alert('Copied'),()=>alert('Copy blocked'))}
+Object.assign(A,{
+ editTpl(id){const t=S.templates.find(x=>x.id===id)||{};form(id?'Edit Template':'New Template',[{k:'name',l:'Name'},{k:'subject',l:'Subject'},{k:'body',l:'Body',t:'area'}],t,o=>{if(!o.name)return alert('Name required')&&false;if(id)Object.assign(t,o);else S.templates.push({id:uid(),...o});save('templates')})},
+ delTpl(id){if(confirm('Delete template?')){S.templates=S.templates.filter(t=>t.id!==id);save('templates')}},
+ emailLead(id){const l=S.leads.find(x=>x.id===id);emailOpen({ref:'L'+id,client:l.company,contact:l.contact||'there',email:l.email,rep:uName(l.owner),tpl:'Intro follow-up'})},
+ emailAcct(id){const a=S.accts.find(x=>x.id===id);emailOpen({ref:'C'+id,client:a.name,contact:a.contact||'there',rep:uName(a.owner),extra:portalText(a),tpl:'Monthly update'})},
+ emailInv(id){const i=S.invoices.find(x=>x.id===id),a=S.accts.find(x=>x.name===i.client),late=!i.paid&&i.due&&new Date(i.due)<new Date();emailOpen({client:i.client,contact:a?.contact||'there',rep:a?uName(a.owner):'Summit Creative',amount:$(i.amount),invoice:'INV-'+i.num,due:i.due||'—',tpl:late?'Overdue notice':'Invoice due'})},
+ newRecur(id){const a=S.accts.find(x=>x.id===id);form('Recurring Invoice',[{k:'client',l:'Client'},{k:'desc',l:'Description'},{k:'amount',l:'Amount ($)',t:'number'},{k:'day',l:'Day of month (1-28)',t:'number'},{k:'next',l:'First invoice date',t:'date'}],a?{client:a.name,desc:'Monthly retainer',amount:a.retainer,day:1,next:addMonth(today(),1)}:{day:1,next:today()},o=>{if(!o.client||!o.amount||!o.next)return alert('Client, amount and first date required')&&false;S.recur.push({id:uid(),...o,active:true});save('recur');tab='inv';render();runRecurring()})},
+ togRecur(id){const r=S.recur.find(x=>x.id===id);r.active=!r.active;save('recur')},
+ delRecur(id){if(confirm('Delete recurring schedule? Existing invoices stay.')){S.recur=S.recur.filter(r=>r.id!==id);save('recur')}},
+ portal(id){const a=S.accts.find(x=>x.id===id);if(!a)return;const inv=S.invoices.filter(i=>i.client===a.name),acts=S.acts.filter(x=>x.client===a.name&&!x.done).sort((x,y)=>new Date(x.dt)-new Date(y.dt)),n=a.steps.length,d=a.steps.filter(s=>s.done).length,p=n?Math.round(d/n*100):0;
+  openModal(`<div class="row"><div><h3>${esc(a.name)} — Client Portal</h3><div class="s">Summit Creative Group • your account manager: ${esc(uName(a.owner))}</div></div><span class="badge o">${$(a.retainer)}/mo</span></div>
+  <div class="t" style="margin-top:12px">Onboarding ${p}%</div><div class="bar"><i class="g" style="width:${p}%"></i></div>${a.steps.map(s=>`<div class="s" style="color:var(--tx)">${s.done?'✅':'⬜'} ${esc(s.text)}</div>`).join('')}
+  <div class="t" style="margin-top:12px">Invoices</div>${inv.map(i=>`<div class="row s" style="color:var(--tx)"><span>INV-${i.num} • ${esc(i.desc)}</span><span>${$(i.amount)} <span class="badge ${i.paid?'o':''}">${i.paid?'PAID':'due '+esc(i.due||'—')}</span></span></div>`).join('')||'<p class="s">No invoices yet.</p>'}
+  <div class="t" style="margin-top:12px">Upcoming meetings & tasks</div>${acts.map(x=>`<div class="s" style="color:var(--tx)">🕒 ${esc(x.dt.replace('T',' '))} — ${esc(x.title)}</div>`).join('')||'<p class="s">Nothing scheduled.</p>'}
+  <div class="acts np"><button onclick="print()">🖨 Print / PDF</button><button class="bg" data-a="emailAcct" data-id="${a.id}">✉️ Email to client</button><button class="b2" data-a="close">Close</button></div>`)}
+});
+
+/* ===== v6: timeline, deliverables, insights, proposals, tasks, files, search, roles, audit ===== */
+let AS=null,MCP=false;const SOURCES=['Website','Referral','Event','Cold outreach','Google / SEO','Social','Partner','Unknown'];
+function slackNotify(){/* Slack notifications are not wired up in the standalone version. */}
+const ME=()=>S.users.find(u=>u.id===MYID),meName=()=>ME()?.name||MYNAME||'Someone',isStaff=()=>ME()?.level==='staff',hidden=t=>isStaff()&&['inv','set','ins'].includes(t);
+const logEv=(ref,text)=>{S.log.unshift({id:uid(),ref,text,by:meName(),at:new Date().toISOString()});S.log=S.log.slice(0,600)};
+const aud=text=>{S.audit.unshift({at:new Date().toISOString(),by:meName(),text});S.audit=S.audit.slice(0,300)};
+function nameOf(id){const f=[[S.leads,'company'],[S.deals,'name'],[S.accts,'name'],[S.tasks,'title'],[S.deliv,'title'],[S.props,'client'],[S.users,'name'],[S.recur,'client'],[S.invoices,'client']];for(const[a,k]of f){const x=a.find(r=>r.id===id||'L'+r.id===id||'D'+r.id===id||'C'+r.id===id);if(x)return x[k]}return id||''}
+function auditClick(t){const a=t.dataset.a;if(/^(del|mv|convert|paid|actDone|reset|save|addUser|accept|togRecur|togDeliv)/.test(a))aud(a+' · '+nameOf(t.dataset.id))}
+function lostCheck(d){if(d.stage===LOST()&&!d.lossReason)d.lossReason=(prompt('Why was this deal lost? (price, timing, competitor, no response, other)')||'Unspecified').trim();if(d.stage!==LOST())delete d.lossReason}
+const fmt=iso=>new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+function auditCard(){return`<div class="card"><div class="t">Audit Log (last 40)</div>${S.audit.slice(0,40).map(a=>`<div class="s" style="margin:4px 0"><b style="color:var(--tx)">${esc(a.by)}</b> • ${esc(a.text)} <span style="float:right">${esc(fmt(a.at))}</span></div>`).join('')||'<p class="s">No entries yet.</p>'}<p class="s" style="margin-top:8px">Roles hide Invoices, Insights and Settings for Staff users in this interface. They do not stop someone with edit access to the page from changing data directly.</p></div>`}
+const dueSort=(a,b)=>(a.due||'9')<(b.due||'9')?-1:1;
+function vTasks(){const T=S.tasks.filter(mine).sort(dueSort),D=S.deliv.filter(d=>mine(d)&&!d.done).sort(dueSort);const od=x=>x.due&&x.due<today();
+ return`<div class="row" style="margin-bottom:10px"><h2>Tasks & Deliverables</h2><div><button class="b2" data-a="ics">⬇ .ics</button> <button class="b2" data-a="digest">📋 Digest</button> <button data-a="editTask">+ Task</button></div></div>
+ ${T.map(k=>`<div class="card" style="${k.done?'opacity:.5':''}"><div class="row"><div><div class="t" style="${k.done?'text-decoration:line-through':''}">${esc(k.title)}</div><div class="s">👤 ${esc(uName(k.owner))} • due ${esc(k.due||'—')}</div></div>${!k.done&&od(k)?'<span class="badge r">OVERDUE</span>':''}</div>${k.items.map(i=>`<label style="display:flex;gap:8px;text-transform:none;font-weight:400;font-size:.84rem;color:var(--tx);margin:4px 0"><input type="checkbox" style="width:auto;margin:0" ${i.done?'checked':''} data-c="titem" data-id="${k.id}" data-s="${i.id}">${esc(i.t)}</label>`).join('')}<div class="acts"><button class="b2" data-a="togTask" data-id="${k.id}">${k.done?'↩':'✅ Done'}</button><button class="b2" data-a="editTask" data-id="${k.id}">✏️</button><button class="bd" data-a="delTask" data-id="${k.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No tasks.</div>'}
+ <h3 style="margin:14px 0 8px">📦 Client deliverables due</h3>${D.map(d=>`<div class="card"><div class="row"><div><div class="t">${esc(d.title)}</div><div class="s">🏢 ${esc(nameOf('C'+d.acct)||'—')} • 👤 ${esc(uName(d.owner))} • due ${esc(d.due||'—')}${d.repeat==='Monthly'?' • 🔁':''}</div></div>${od(d)?'<span class="badge r">OVERDUE</span>':''}</div><div class="acts"><button class="b2" data-a="togDeliv" data-id="${d.id}">✅ Delivered</button></div></div>`).join('')||'<div class="card s">Nothing due. Add deliverables from a client card (📦).</div>'}`}
+function vIns(){const AC=S.accts.filter(a=>a.status!=='Churned'),mrr=AC.reduce((t,a)=>t+(Number(a.retainer)||0),0),now=Date.now();
+ const touch=a=>Math.max(0,...S.log.filter(l=>l.ref==='C'+a.id).map(l=>+new Date(l.at)),...S.acts.filter(x=>x.client===a.name).map(x=>+new Date(x.dt)).filter(t=>t<=now),...S.deliv.filter(d=>d.acct===a.id&&d.done).map(d=>+new Date(d.doneAt||0)),a.created?+new Date(a.created):0);
+ const risk=AC.filter(a=>now-touch(a)>2592e6),ren=AC.filter(a=>a.renewal&&new Date(a.renewal)-now<5184e6&&new Date(a.renewal)-now>-864e5).sort((a,b)=>a.renewal<b.renewal?-1:1);
+ const bs={};S.deals.filter(d=>d.stage===WON()).forEach(d=>{const sv=d.services||[],tot=sum(sv)||1;sv.forEach(x=>bs[x]=(bs[x]||0)+d.amount*rate(x)/tot)});const bm=Math.max(1,...Object.values(bs));
+ const src={};S.leads.forEach(l=>{const k=l.source||'Unknown';(src[k]=src[k]||{l:0,w:0,x:0}).l++});S.deals.forEach(d=>{const o=src[d.source||'Unknown']=src[d.source||'Unknown']||{l:0,w:0,x:0};if(d.stage===WON())o.w++;if(d.stage===LOST())o.x++});
+ const lr={};S.deals.filter(d=>d.stage===LOST()).forEach(d=>{const k=d.lossReason||'Unspecified';lr[k]=(lr[k]||0)+1});const lm=Math.max(1,...Object.values(lr));
+ return`<h2 style="margin-bottom:10px">Retention & Insights</h2><div class="kpis"><div class="kpi">MRR<b>${$(mrr)}</b></div><div class="kpi">ARR run-rate<b>${$(mrr*12)}</b></div><div class="kpi">Active clients<b>${AC.length}</b></div><div class="kpi">At risk<b style="color:${risk.length?'#f87171':'var(--ok)'}">${risk.length}</b></div></div>
+ <div class="g2"><div class="card"><div class="t">⚠ At risk (no touch in 30+ days)</div>${risk.map(a=>`<div class="row s" style="color:var(--tx);margin:6px 0"><span>${esc(a.name)} • ${$(a.retainer)}/mo</span><button class="b2" data-a="hist" data-id="C${a.id}">Log touch</button></div>`).join('')||'<p class="s">All clients touched recently.</p>'}</div>
+ <div class="card"><div class="t">🔔 Renewals in next 60 days</div>${ren.map(a=>`<div class="row s" style="color:var(--tx);margin:6px 0"><span>${esc(a.name)}</span><b>${esc(a.renewal)}</b></div>`).join('')||'<p class="s">None. Set renewal dates with ✏️ on a client.</p>'}</div></div>
+ <div class="card"><div class="t">Est. MRR by service (won deals)</div>${Object.entries(bs).sort((a,b)=>b[1]-a[1]).map(([k,v])=>bar(esc(k),$(v),1).replace(/width:[^"]*/,'width:'+Math.max(6,v/bm*100)+'%')).join('')||'<p class="s">Win a deal to see this.</p>'}</div>
+ <div class="g2"><div class="card"><div class="t">Lead source performance</div>${Object.entries(src).map(([k,o])=>`<div class="row s" style="color:var(--tx);margin:5px 0"><span>${esc(k)}</span><span>${o.l} leads • ${o.w} won • ${o.x} lost • <b style="color:var(--cyan)">${o.w+o.x?Math.round(o.w/(o.w+o.x)*100)+'% win':'—'}</b></span></div>`).join('')||'<p class="s">Set a source on leads.</p>'}</div>
+ <div class="card"><div class="t">Why we lose deals</div>${Object.entries(lr).map(([k,v])=>bar(esc(k),v,lm,'y')).join('')||'<p class="s">No lost deals yet.</p>'}</div></div>`}
+const dtStr=x=>x.replace(/[-:]/g,'').slice(0,13)+'00';
+Object.assign(A,{
+ hist(ref){const L=S.log.filter(l=>l.ref===ref);openModal(`<h3>🕒 ${esc(nameOf(ref))} — history</h3><div class="row" style="margin:10px 0"><input id="nn" placeholder="Log a call, note, decision…" style="flex:1;margin:0"><button data-a="addNote" data-id="${ref}">+ Note</button></div>${L.map(l=>`<div class="s" style="margin:7px 0;color:var(--tx)">• ${esc(l.text)}<div class="s">${esc(l.by)} • ${esc(fmt(l.at))}</div></div>`).join('')||'<p class="s">No history yet.</p>'}<button class="b2" data-a="close">Close</button>`)},
+ addNote(ref){const t=el('nn').value.trim();if(!t)return;logEv(ref,'📝 '+t);save('log');A.hist(ref)},
+ deliv(id){window._da=id;const D=S.deliv.filter(d=>d.acct===id).sort(dueSort);openModal(`<h3>📦 ${esc(nameOf('C'+id))} — deliverables</h3>${D.map(d=>`<div class="row" style="align-items:center;margin:8px 0;${d.done?'opacity:.5':''}"><div><b>${esc(d.title)}</b><div class="s">${esc(uName(d.owner))} • due ${esc(d.due||'—')}${d.repeat==='Monthly'?' • 🔁':''}</div></div><div><button class="b2" data-a="togDeliv" data-id="${d.id}">${d.done?'↩':'✅'}</button> <button class="bd" data-a="delDeliv" data-id="${d.id}">🗑️</button></div></div>`).join('')||'<p class="s">None yet.</p>'}<div class="acts"><button data-a="addDeliv" data-id="${id}">+ Deliverable</button><button class="b2" data-a="close">Close</button></div>`)},
+ addDeliv(id){form('New Deliverable',[{k:'title',l:'Deliverable (e.g. Monthly SEO report)'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'due',l:'Due',t:'date'},{k:'repeat',l:'Repeat',t:'sel',o:['One-time','Monthly']}],{owner:S.users[0]?.id,due:today()},o=>{if(!o.title)return alert('Title required')&&false;S.deliv.push({id:uid(),acct:id,...o,done:false});save('deliv');setTimeout(()=>A.deliv(id),0)})},
+ togDeliv(id){const d=S.deliv.find(x=>x.id===id);d.done=!d.done;if(d.done){d.doneAt=new Date().toISOString();logEv('C'+d.acct,'📦 Delivered: '+d.title);if(d.repeat==='Monthly'&&d.due&&!S.deliv.some(x=>x.prev===d.id))S.deliv.push({...d,id:uid(),prev:d.id,done:false,doneAt:null,due:addMonth(d.due,d.due.slice(8,10))})}save('deliv');if(el('modal').style.display==='block'&&window._da)A.deliv(window._da)},
+ delDeliv(id){S.deliv=S.deliv.filter(x=>x.id!==id);save('deliv');A.deliv(window._da)},
+ editAcct(id){const a=S.accts.find(x=>x.id===id);form('Edit Client',[{k:'name',l:'Business name'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'owner',l:'Account manager',t:'sel',o:owners()},{k:'retainer',l:'Monthly retainer ($)',t:'number'},{k:'renewal',l:'Contract renewal date',t:'date'},{k:'status',l:'Status',t:'sel',o:['Active','Churned']}],a,o=>{if(!o.name)return alert('Name required')&&false;if(a.status!==o.status)logEv('C'+id,'Status → '+o.status);Object.assign(a,o);save('accts')})},
+ props(){openModal(`<h3>📑 Proposals</h3>${S.props.map(p=>`<div class="card"><div class="row"><div><div class="t">#${p.num} • ${esc(p.client)}</div><div class="s">${$(p.monthly)}/mo + ${$(p.setup)} setup • ${esc(p.date)}</div><div class="s">${p.items.map(i=>esc(i.s)).join(', ')}</div></div><select data-c="pstat" data-id="${p.id}" style="width:auto">${['Draft','Sent','Accepted','Declined'].map(x=>`<option ${x===p.status?'selected':''}>${x}</option>`).join('')}</select></div><div class="acts">${p.status!=='Accepted'?`<button class="bg" data-a="accept" data-id="${p.id}">✅ Accept → Client + recurring invoice</button>`:'<span class="badge o">Converted</span>'}<button class="bd" data-a="delProp" data-id="${p.id}">🗑️</button></div></div>`).join('')||'<p class="s">No saved proposals. Use 💾 Save proposal inside a quote.</p>'}<button class="b2" data-a="close">Close</button>`)},
+ delProp(id){S.props=S.props.filter(x=>x.id!==id);save('props');A.props()},
+ accept(id){const p=S.props.find(x=>x.id===id);if(!p||p.status==='Accepted')return;p.status='Accepted';let d=S.deals.find(x=>x.id===p.dealId);
+  if(!d){d={id:uid(),name:p.client+' – proposal '+p.num,account:p.client,email:p.email,owner:p.owner||S.users[0]?.id,stage:S.cfg.stages[0],amount:p.monthly,close:today(),services:p.items.map(i=>i.s),source:'Unknown'};S.deals.unshift(d)}
+  d.stage=WON();d.amount=p.monthly||d.amount;wonCheck(d);const a=S.accts.find(x=>x.dealId===d.id);if(a)a.retainer=p.monthly;
+  if(p.monthly)S.recur.push({id:uid(),client:p.client,desc:'Monthly retainer',amount:p.monthly,day:1,next:addMonth(today(),1),active:true});
+  if(p.setup>0)S.invoices.push({id:uid(),num:Math.max(1000,...S.invoices.map(i=>i.num))+1,client:p.client,desc:'One-time setup (proposal '+p.num+')',amount:Math.max(0,p.setup-p.disc),date:today(),due:addDays(today(),14),paid:false});
+  logEv('D'+d.id,'Proposal '+p.num+' accepted → client, recurring invoice created');save('props','deals','accts','recur','invoices');A.props()},
+ editTask(id){const k=S.tasks.find(x=>x.id===id)||{owner:S.users[0]?.id,due:today(),items:[]};form(id?'Edit Task':'New Task',[{k:'title',l:'Task'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'due',l:'Due',t:'date'},{k:'lines',l:'Checklist (one item per line)',t:'area'}],{...k,lines:k.items.map(i=>i.t).join(NL)},o=>{if(!o.title)return alert('Title required')&&false;const items=o.lines.split(NL).map(x=>x.trim()).filter(Boolean).map(t=>({id:uid(),t,done:!!(k.items.find(i=>i.t===t)||{}).done}));if(id)Object.assign(k,{title:o.title,owner:o.owner,due:o.due,items});else S.tasks.unshift({id:uid(),title:o.title,owner:o.owner,due:o.due,items,done:false});save('tasks')})},
+ togTask(id){const k=S.tasks.find(x=>x.id===id);k.done=!k.done;save('tasks')},delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);save('tasks')},
+ ics(){const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Summit Creative//CRM//EN'],ev=(u,t,start,all)=>L.push('BEGIN:VEVENT','UID:'+u+'@summit-crm','DTSTAMP:'+new Date().toISOString().replace(/[-:]|\.\d+/g,''),all?'DTSTART;VALUE=DATE:'+start.replace(/-/g,''):'DTSTART:'+dtStr(start),'SUMMARY:'+t.replace(/[,;]/g,' '),'END:VEVENT');
+  S.acts.filter(a=>!a.done&&mine(a)).forEach(a=>ev(a.id,a.type+': '+a.title+' ('+a.client+')',a.dt));S.tasks.filter(k=>!k.done&&k.due&&mine(k)).forEach(k=>ev(k.id,'Task: '+k.title,k.due,1));S.deliv.filter(d=>!d.done&&d.due&&mine(d)).forEach(d=>ev(d.id,'Deliver: '+d.title+' ('+nameOf('C'+d.acct)+')',d.due,1));L.push('END:VCALENDAR');doDownload('summit_calendar.ics',L.join(String.fromCharCode(13,10)))},
+ digest(){const t=today(),lines=['SUMMIT DAILY DIGEST — '+t,'','Meetings / follow-ups due:',...S.acts.filter(a=>!a.done&&mine(a)&&a.dt.slice(0,10)<=t).map(a=>'• '+a.dt.replace('T',' ')+' '+a.title+' ('+a.client+')'),'','Tasks due:',...S.tasks.filter(k=>!k.done&&k.due&&k.due<=t&&mine(k)).map(k=>'• '+k.title+' (due '+k.due+')'),'','Deliverables due:',...S.deliv.filter(d=>!d.done&&d.due&&d.due<=t&&mine(d)).map(d=>'• '+d.title+' — '+nameOf('C'+d.acct)),'','Overdue invoices:',...S.invoices.filter(i=>!i.paid&&i.due&&i.due<t).map(i=>'• INV-'+i.num+' '+i.client+' '+$(i.amount))],txt=lines.join(NL);
+  openModal(`<h3>📋 Daily digest</h3><textarea id="dg" rows="14">${esc(txt)}</textarea><div class="acts"><button id="dgm">📧 Email to me</button><button class="b2" id="dgc">📋 Copy</button><button class="b2" data-a="close">Close</button></div>`);el('dgm').onclick=()=>location.href='mailto:?subject='+encodeURIComponent('Summit digest '+t)+'&body='+encodeURIComponent(el('dg').value);el('dgc').onclick=()=>navigator.clipboard.writeText(el('dg').value).then(()=>alert('Copied'),()=>alert('Copy blocked'))},
+ files(ref){const F=S.files.filter(f=>f.ref===ref);openModal(`<h3>📎 ${esc(nameOf(ref))} — files & links</h3>${F.map(f=>`<div class="row" style="align-items:center;margin:7px 0"><a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--cyan)">${esc(f.name)}</a><button class="bd" data-a="delFile" data-id="${f.id}">🗑️</button></div>`).join('')||'<p class="s">Nothing attached.</p>'}${AS?`<label style="margin-top:10px">Upload file (≤20 MB)</label><input type="file" id="fup">`:'<p class="s">In-app upload needs Editor access; you can still add links.</p>'}${MCP?`<button class="b2" style="margin-top:6px" data-a="driveUpload" data-id="${ref}">🗂️ Upload to Drive instead</button>`:''}<label>Or add a link</label><input id="fln" placeholder="Name"><input id="flu" placeholder="https://…"><div class="acts"><button data-a="addLink" data-id="${ref}">+ Link</button><button class="b2" data-a="close">Close</button></div>`);
+  window._fr=ref;if(AS)el('fup').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await AS.upload(f);S.files.push({id:uid(),ref,name:f.name,url:r.url,aid:r.id});logEv(ref,'📎 Attached '+f.name);save('files');A.files(ref)}catch(x){alert('Upload failed: '+(x.message||x.code||x))}}},
+ addLink(ref){const n=el('fln').value.trim(),u=el('flu').value.trim();if(!n||!/^https?:\/\//i.test(u))return alert('Enter a name and a full http(s) link.');S.files.push({id:uid(),ref,name:n,url:u});logEv(ref,'🔗 Linked '+n);save('files');A.files(ref)},
+ async delFile(id){const f=S.files.find(x=>x.id===id);if(!f||!confirm('Remove '+f.name+'?'))return;if(f.aid&&AS)try{await AS.delete(f.aid)}catch(e){}S.files=S.files.filter(x=>x.id!==id);save('files');A.files(window._fr)},
+ goto(t){closeM();A.tab(t)},
+ search(){openModal(`<input id="sq" placeholder="Search leads, deals, clients, invoices, tasks…" style="margin-bottom:10px"><div id="sr"></div>`);const sq=el('sq');sq.focus();sq.oninput=()=>{const q=sq.value.toLowerCase().trim();if(q.length<2){el('sr').innerHTML='';return}const R=[];const add=(tab,ic,label,sub)=>{if(!hidden(tab)&&(label+' '+sub).toLowerCase().includes(q))R.push(`<button class="b2" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-a="goto" data-id="${tab}">${ic} <b>${esc(label)}</b> <span class="s">${esc(sub)}</span></button>`)};
+   S.leads.forEach(l=>add('leads','🎯',l.company,l.contact+' '+l.email+' '+l.services.join(' ')+' '+l.notes));S.deals.forEach(d=>add('deals','💼',d.name,d.account+' '+d.stage));S.accts.forEach(a=>add('clients','🚀',a.name,a.contact));S.invoices.forEach(i=>add('inv','🧾','INV-'+i.num,i.client+' '+i.desc));S.tasks.forEach(k=>add('tasks','✅',k.title,''));S.acts.forEach(a=>add('cal','📅',a.title,a.client));S.deliv.forEach(d=>add('tasks','📦',d.title,nameOf('C'+d.acct)));
+   el('sr').innerHTML=R.slice(0,25).join('')||'<p class="s">No matches.</p>'}}
+});
+
+/* ===== v7: import from / export to other CRMs ===== */
+const normH=h=>String(h).toLowerCase().replace(/[^a-z0-9]/g,'');
+const IF={leads:[['company','Company'],['contact','Contact name'],['phone','Phone'],['email','Email'],['source','Lead source'],['disposition','Status'],['value','Monthly value'],['services','Services'],['notes','Notes'],['owner','Owner']],
+ deals:[['name','Deal name'],['account','Client / company'],['email','Email'],['stage','Stage'],['amount','Amount'],['close','Close date'],['source','Source'],['services','Services'],['owner','Owner']],
+ clients:[['name','Business name'],['contact','Contact'],['phone','Phone'],['retainer','Monthly retainer'],['renewal','Renewal date'],['status','Status'],['owner','Owner']]};
+const SYN={company:['company','companyname','organization','organizationname','organisation','accountname','account','business','businessname','associatedcompany'],
+ contact:['contactname','fullname','personname','firstlastname','contact','leadname','name'],phone:['phone','phonenumber','personphone','mobile','mobilephone','workphone','telephone'],
+ email:['email','emailaddress','personemail','workemail'],source:['leadsource','source','dealsource'],disposition:['leadstatus','status','disposition'],value:['monthlyvalue','value','amount'],
+ services:['services','interestedservices','products','product'],notes:['notes','description','note','comments'],owner:['leadowner','dealowner','contactowner','accountowner','owner','assignedto','ownername'],
+ 'deals.name':['dealname','dealtitle','opportunityname','title','name'],'deals.account':['accountname','associatedcompany','organization','organizationname','company','companyname'],
+ 'deals.stage':['dealstage','stagename','stage','pipelinestage'],'deals.amount':['amount','dealvalue','value'],'deals.close':['closedate','closingdate','expectedclosedate','dealexpectedclosedate'],
+ 'clients.name':['accountname','companyname','company','organization','organizationname','organisation','businessname','name'],'clients.contact':['contactname','fullname','personname','firstlastname','contact'],
+ 'clients.retainer':['monthlyretainer','retainer','mrr','monthlyvalue','amount'],'clients.renewal':['renewaldate','contractrenewaldate','contractenddate'],'clients.status':['accountstatus','status']};
+function guess(type,k,H){const list=SYN[type+'.'+k]||SYN[k]||[],N=H.map(normH);for(const x of list){const i=N.indexOf(x);if(i>=0)return i}return -1}
+function parseCSV(t){t=t.replace(/^\uFEFF/,'');const f1=t.split(/\r?\n/)[0]||'',cnt=c=>(f1.split(c).length-1),d=[['\t',cnt('\t')],[';',cnt(';')],[',',cnt(',')]].sort((a,b)=>b[1]-a[1])[0][0];
+ const rows=[];let row=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}else if(c==='"')q=true;else if(c===d){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';if(row.some(x=>x.trim()!==''))rows.push(row);row=[]}else f+=c}
+ row.push(f);if(row.some(x=>x.trim()!==''))rows.push(row);return rows}
+let IMPD=null;
+const num=x=>Number(String(x).replace(/[^0-9.\-]/g,''))||0,dt=x=>{const d=new Date(x);return x&&!isNaN(d)?d.toISOString().slice(0,10):''};
+const csvStr=rows=>rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join(NL);
+const sp=n=>{const p=(n||'').trim().split(/\s+/).filter(Boolean);return[p[0]||'',p.slice(1).join(' ')]};
+function ioCard(){const li=S.cfg.lastImport;return`<div class="card"><div class="t">🔄 Import / Export (other CRMs)</div><p class="s" style="margin:6px 0">Import CSV exports from HubSpot, Salesforce, Pipedrive, Zoho or any spreadsheet. Export in each system's column layout for their CSV importers.</p><div class="acts" style="border:0;margin:0;padding:0"><button data-a="impOpen">⬆ Import CSV</button><button class="b2" data-a="expOpen">⬇ Export for another CRM</button><button class="b2" data-a="restoreOpen">♻ Restore JSON backup</button>${li?`<button class="bd" data-a="impUndo">↩ Undo last import (${li.count} ${esc(li.type)})</button>`:''}</div></div>`}
+const EXP={
+ HubSpot:{leads:()=>[['Company Name','First Name','Last Name','Email','Phone Number','Lead Status','Lead Source','Notes']].concat(S.leads.map(l=>{const[f,la]=sp(l.contact);return[l.company,f,la,l.email,l.phone,l.disposition,l.source||'',l.notes]})),
+  deals:()=>[['Deal Name','Deal Stage','Amount','Close Date','Associated Company']].concat(S.deals.map(d=>[d.name,d.stage,d.amount,d.close,d.account])),
+  clients:()=>[['Company name','Phone Number','Annual Revenue']].concat(S.accts.map(a=>[a.name,a.phone,(a.retainer||0)*12]))},
+ Salesforce:{leads:()=>[['First Name','Last Name','Company','Email','Phone','Lead Source','Status','Description']].concat(S.leads.map(l=>{const[f,la]=sp(l.contact);return[f,la||l.company,l.company,l.email,l.phone,l.source||'',l.disposition,l.notes]})),
+  deals:()=>[['Opportunity Name','Account Name','Stage','Amount','Close Date','Lead Source']].concat(S.deals.map(d=>[d.name,d.account,d.stage,d.amount,d.close,d.source||''])),
+  clients:()=>[['Account Name','Phone','Annual Revenue']].concat(S.accts.map(a=>[a.name,a.phone,(a.retainer||0)*12]))},
+ Pipedrive:{leads:()=>[['Person - Name','Person - Email','Person - Phone','Organization - Name']].concat(S.leads.map(l=>[l.contact||l.company,l.email,l.phone,l.company])),
+  deals:()=>[['Deal - Title','Deal - Value','Deal - Stage','Deal - Expected close date','Organization - Name']].concat(S.deals.map(d=>[d.name,d.amount,d.stage,d.close,d.account])),
+  clients:()=>[['Organization - Name','Person - Name','Person - Phone']].concat(S.accts.map(a=>[a.name,a.contact,a.phone]))},
+ Zoho:{leads:()=>[['Company','First Name','Last Name','Email','Phone','Lead Source','Lead Status','Description']].concat(S.leads.map(l=>{const[f,la]=sp(l.contact);return[l.company,f,la||l.company,l.email,l.phone,l.source||'',l.disposition,l.notes]})),
+  deals:()=>[['Deal Name','Account Name','Stage','Amount','Closing Date']].concat(S.deals.map(d=>[d.name,d.account,d.stage,d.amount,d.close])),
+  clients:()=>[['Account Name','Phone','Annual Revenue']].concat(S.accts.map(a=>[a.name,a.phone,(a.retainer||0)*12]))}};
+const fileText=(f,cb)=>{const r=new FileReader();r.onload=()=>cb(String(r.result));r.readAsText(f)};
+Object.assign(A,{
+ impOpen(){openModal(`<h3>⬆ Import from another CRM</h3><p class="s">Export a CSV from HubSpot, Salesforce, Pipedrive, Zoho, or any spreadsheet and choose it here. You review the column mapping before anything is imported.</p><label style="margin-top:10px">What are you importing?</label><select id="imt"><option value="leads">Leads / Contacts</option><option value="deals">Deals / Opportunities</option><option value="clients">Clients / Accounts</option></select><label>CSV file</label><input type="file" id="imf" accept=".csv,.tsv,.txt,text/csv"><label>…or paste CSV text</label><textarea id="imx" rows="4"></textarea><div class="acts"><button id="imn">Next: map columns</button><button class="b2" data-a="close">Cancel</button></div>`);
+  const go=t=>{const rows=parseCSV(t);if(rows.length<2)return alert('Could not find a header row plus data rows.');const H=rows[0].map(x=>x.trim()),R=rows.slice(1,2001),N=H.map(normH);
+   if(N.includes('firstname')&&N.includes('lastname')&&!['fullname','contactname','personname'].some(x=>N.includes(x))){const a=N.indexOf('firstname'),b=N.indexOf('lastname');H.push('First + Last name');R.forEach(r=>r.push(((r[a]||'')+' '+(r[b]||'')).trim()))}
+   IMPD={type:el('imt').value,H,R};A.impMap()};
+  el('imn').onclick=()=>{const f=el('imf').files[0];if(f)fileText(f,go);else if(el('imx').value.trim())go(el('imx').value);else alert('Choose a file or paste CSV text.')}},
+ impMap(){const{type,H,R}=IMPD;openModal(`<h3>Map columns • ${R.length} rows</h3><p class="s">Matches were guessed from column names. Fix anything wrong; choose “skip” for fields you don't have.</p>${IF[type].map(([k,l])=>{const g=guess(type,k,H);return`<label style="margin-top:6px">${esc(l)}</label><select id="im_${k}"><option value="">(skip)</option>${H.map((h,i)=>`<option value="${i}" ${i===g?'selected':''}>${esc(h)} — e.g. ${esc(String((R[0]||[])[i]??'').slice(0,28))}</option>`).join('')}</select>`}).join('')}
+  <label>If a record already exists (same email, or same company/name)</label><select id="imd"><option value="skip">Skip it</option><option value="update">Update it with imported values</option><option value="add">Import anyway (allow duplicates)</option></select><label>Owner when none matches a CRM user</label><select id="imo">${optU(S.users[0]?.id)}</select><div class="acts"><button data-a="impRun">Import ${R.length} rows</button><button class="b2" data-a="impOpen">Back</button><button class="b2" data-a="close">Cancel</button></div>`)},
+ impRun(){const{type,R}=IMPD,m={};IF[type].forEach(([k])=>m[k]=el('im_'+k).value);const get=(r,k)=>m[k]===''?'':String(r[m[k]]??'').trim(),mode=el('imd').value,defO=el('imo').value,batch=uid();let add=0,upd=0,skip=0;
+  const owner=r=>{const n=get(r,'owner').toLowerCase();return(n&&S.users.find(u=>u.name.toLowerCase()===n||n.startsWith(u.name.toLowerCase())||u.name.toLowerCase().startsWith(n)))?.id||defO};
+  const svc=r=>get(r,'services').split(/[;,|]/).map(x=>x.trim().toLowerCase()).map(x=>SRV.find(v=>v.toLowerCase()===x)).filter(Boolean);
+  const src=r=>{const x=get(r,'source').toLowerCase();return SOURCES.find(v=>v.toLowerCase()===x)||SOURCES.find(v=>x&&(v.toLowerCase().includes(x)||x.includes(v.toLowerCase().split(' ')[0])))||'Unknown'};
+  const low=x=>String(x||'').toLowerCase();
+  R.forEach(r=>{let o,ex;
+   if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
+    ex=S.leads.find(l=>(o.email&&low(l.email)===low(o.email))||(low(l.company)===low(o.company)&&low(l.contact)===low(o.contact)));
+    if(!ex||mode==='add'){S.leads.unshift({id:uid(),imp:batch,...o});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
+   if(type==='deals'){const nm=get(r,'name')||get(r,'account');if(!nm){skip++;return}const sv=svc(r),st=get(r,'stage'),ls=low(st);const stage=S.cfg.stages.find(x=>low(x)===ls)||(/won/.test(ls)?WON():/lost/.test(ls)?LOST():S.cfg.stages[0]);
+    o={name:nm,account:get(r,'account')||nm,email:get(r,'email'),stage,amount:num(get(r,'amount'))||sum(sv),close:dt(get(r,'close')),source:src(r),services:sv,owner:owner(r)};
+    ex=S.deals.find(d=>low(d.name)===low(o.name)&&low(d.account)===low(o.account));
+    if(!ex||mode==='add'){const d={id:uid(),imp:batch,...o};if(d.stage===LOST())d.lossReason='Imported';S.deals.unshift(d);d.lastStage=d.stage;if(d.stage===WON()&&!S.accts.some(a=>low(a.name)===low(d.account)))wonCheck(d);add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
+   if(type==='clients'){const nm=get(r,'name');if(!nm){skip++;return}const stt=get(r,'status');o={name:nm,contact:get(r,'contact'),phone:get(r,'phone'),owner:owner(r),retainer:num(get(r,'retainer')),renewal:dt(get(r,'renewal')),status:/churn|inactive|lost|cancel/.test(low(stt))?'Churned':'Active'};
+    ex=S.accts.find(a=>low(a.name)===low(nm));
+    if(!ex||mode==='add'){S.accts.unshift({...mkAcct(o),imp:batch,renewal:o.renewal,status:o.status});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&v!==0)ex[k]=v});upd++}else skip++}});
+  S.cfg.lastImport={id:batch,type,count:add,at:new Date().toISOString()};aud('Import '+type+': '+add+' added, '+upd+' updated, '+skip+' skipped');save('leads','deals','accts','cfg');closeM();alert('Import finished: '+add+' added, '+upd+' updated, '+skip+' skipped.')},
+ impUndo(){const li=S.cfg.lastImport;if(!li||!confirm('Remove the '+li.count+' '+li.type+' added by the last import? (Records you edited by hand are removed too.)'))return;const gone=S.deals.filter(d=>d.imp===li.id).map(d=>d.id);S.leads=S.leads.filter(x=>x.imp!==li.id);S.acts=S.acts.filter(x=>x.imp!==li.id);S.deals=S.deals.filter(x=>x.imp!==li.id);S.accts=S.accts.filter(x=>x.imp!==li.id&&!gone.includes(x.dealId));delete S.cfg.lastImport;aud('Undo import');save('leads','deals','accts','acts','cfg')},
+ expOpen(){openModal(`<h3>⬇ Export for another CRM</h3><label>Target CRM</label><select id="exf">${Object.keys(EXP).map(k=>`<option>${k}</option>`).join('')}</select><label>Data</label><select id="exd"><option value="leads">Leads / Contacts</option><option value="deals">Deals / Opportunities</option><option value="clients">Clients / Accounts</option></select><p class="s" style="margin:6px 0">Columns follow each system's usual import headers. In their import wizard, map any column that doesn't match automatically, and create matching pipeline stages first (your stage names are exported as-is).</p><div class="acts"><button id="exg">Download CSV</button><button class="b2" data-a="close">Cancel</button></div>`);
+  el('exg').onclick=()=>{const f=el('exf').value,d=el('exd').value;doDownload(`summit_${f.toLowerCase()}_${d}.csv`,csvStr(EXP[f][d]()));aud('Exported '+d+' for '+f)}},
+ restoreOpen(){openModal(`<h3>♻ Restore JSON backup</h3><p class="s">Choose a backup made with “JSON backup”. This <b>replaces all current data</b> for everyone.</p><input type="file" id="rjf" accept=".json,application/json"><div class="acts"><button class="b2" data-a="close">Cancel</button></div>`);
+  el('rjf').onchange=e=>{const f=e.target.files[0];if(!f)return;fileText(f,t=>{let d;try{d=JSON.parse(t)}catch(x){return alert('That file is not valid JSON.')}if(!d||!Array.isArray(d.users)||!Array.isArray(d.leads))return alert('This does not look like a Summit CRM backup.');if(!confirm('Replace ALL current data with this backup?'))return;merge(d);aud('Restored JSON backup');save();closeM()})}}
+});
+
+/* ===== v8: website lead capture (merged with live 1792182599-07aa) ===== */
+function webCard(){return`<div class="card"><div class="t">🌐 Website Lead Capture</div><p class="s" style="margin:6px 0">1) Paste your form service's endpoint (Formspree, a Zapier/Make webhook, etc.) and generate form code for your site. 2) When submissions arrive, paste them here to create leads and a follow-up task in one step.</p><label>Form endpoint URL</label><input id="wep" value="${esc(S.cfg.webEndpoint||'')}" placeholder="https://formspree.io/f/xxxx"><div class="acts" style="border:0;margin:0;padding:0"><button data-a="webCode">&lt;/&gt; Generate form code</button><button class="b2" data-a="webImport">📥 Import submissions</button></div></div>`}
+const gv=(o,names)=>{for(const[k,v]of Object.entries(o)){if(names.includes(normH(k))&&String(v??'').trim()&&typeof v!=='object')return String(v).trim()}return''};
+function parseSubs(t){t=t.trim();if(!t)return[];
+ try{const j=JSON.parse(t);return(Array.isArray(j)?j:[j]).filter(x=>x&&typeof x==='object')}catch(e){}
+ const first=t.split(/\r?\n/)[0];
+ if(!/^[^:\n]{1,40}:\s/.test(first)&&first.includes(',')){const r=parseCSV(t);if(r.length>1){const H=r[0];return r.slice(1).map(row=>Object.fromEntries(H.map((h,i)=>[h,row[i]??''])))}}
+ return t.split(/\r?\n\s*\r?\n|\r?\n-{3,}\r?\n/).map(b=>{const o={};b.split(/\r?\n/).forEach(l=>{const m=l.match(/^\s*([^:]{1,40}):\s*(.*)$/);if(m)o[m[1].trim()]=m[2].trim()});return o}).filter(o=>Object.keys(o).length)}
+Object.assign(A,{
+ webCode(){const ep=el('wep').value.trim();if(!/^https:\/\//i.test(ep))return alert('Enter your form service endpoint (must start with https://).');S.cfg.webEndpoint=ep;save('cfg');
+  const code=`${'<'}!-- Summit Creative lead form --${'>'}
+<form action="${ep}" method="POST" id="summit-lead-form">
+  <input name="name" placeholder="Your name" required>
+  <input name="email" type="email" placeholder="Email" required>
+  <input name="phone" type="tel" placeholder="Phone">
+  <input name="company" placeholder="Company">
+  <select name="service"><option value="">Service interested in</option>${SRV.map(x=>`<option>${x}</option>`).join('')}</select>
+  <textarea name="message" placeholder="How can we help?"></textarea>
+  <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+  <input type="hidden" name="page_url"><input type="hidden" name="utm_source"><input type="hidden" name="utm_medium"><input type="hidden" name="utm_campaign">
+  <p style="font-size:12px">By submitting you agree to be contacted by Summit Creative Group.</p>
+  <button type="submit">Send</button>
+</form>
+<${'script'}>
+(function(){var f=document.getElementById('summit-lead-form'),p=new URLSearchParams(location.search);
+f.page_url.value=location.href;['utm_source','utm_medium','utm_campaign'].forEach(function(k){f[k].value=p.get(k)||''});})();
+<\/${'script'}>`;
+  openModal(`<h3>&lt;/&gt; Website form code</h3><p class="s">Paste into your site's HTML (WordPress custom HTML block, Wix/Squarespace embed, etc.). Style it to match your site. It posts to your form service, which stores or emails each submission; bring those into the CRM with “Import submissions”. Honeypot spam field and UTM tracking are included.</p><textarea id="wcd" rows="14" readonly>${esc(code)}</textarea><div class="acts"><button id="wcp">📋 Copy code</button><button class="b2" data-a="close">Close</button></div>`);
+  el('wcp').onclick=()=>navigator.clipboard.writeText(el('wcd').value).then(()=>alert('Copied'),()=>{el('wcd').select()})},
+ webImport(){openModal(`<h3>📥 Import website submissions</h3><p class="s">Paste submissions from your form service: notification emails (Name: …, Email: … lines, blank line between entries), a CSV export, or JSON from a webhook.</p><textarea id="wix" rows="9" placeholder="Name: Jane Smith&#10;Email: jane@acme.com&#10;Message: Need SEO help"></textarea><label>Assign new leads to</label><select id="wia"><option value="rr">Round-robin across team</option>${optU()}</select><label style="display:flex;gap:8px;text-transform:none;font-weight:400;font-size:.85rem;color:var(--tx)"><input type="checkbox" id="wif" checked style="width:auto;margin:0">Create a High-priority follow-up due in 1 hour</label><div class="acts"><button id="wig">Create leads</button><button class="b2" data-a="close">Cancel</button></div>`);
+  el('wig').onclick=()=>{const subs=parseSubs(el('wix').value);if(!subs.length)return alert('No submissions found in that text.');const mode=el('wia').value,fu=el('wif').checked,batch=uid(),low=x=>String(x||'').toLowerCase();let add=0,dup=0,skip=0,n=0;
+   subs.slice(0,500).forEach(o=>{const first=gv(o,['firstname']),last=gv(o,['lastname']),name=gv(o,['name','fullname','yourname','contactname'])||(first+' '+last).trim(),email=gv(o,['email','emailaddress','youremail']),company=gv(o,['company','companyname','business','organization']);
+    if(!name&&!email&&!company){skip++;return}
+    const msg=gv(o,['message','comments','notes','details','howcanwehelp','howcanwehelpyou','inquiry']),page=gv(o,['pageurl','page','url']),us=gv(o,['utmsource','referrer']),um=gv(o,['utmmedium']),uc=gv(o,['utmcampaign']),svs=gv(o,['service','services','interest','interestedin']);
+    const ex=email&&S.leads.find(l=>low(l.email)===low(email));
+    if(ex){logEv('L'+ex.id,'🌐 Submitted the web form again'+(msg?': '+msg:''));dup++;return}
+    const sv=SRV.filter(x=>low(svs).includes(low(x))),x=low(us),source=/google|bing|seo|organic/.test(x)?'Google / SEO':/facebook|instagram|linkedin|tiktok|twitter|social/.test(x)?'Social':/partner/.test(x)?'Partner':/referral/.test(x)?'Referral':'Website';
+    const owner=mode==='rr'?S.users[(S.leads.length+n++)%S.users.length].id:mode,notes=[msg,page&&'Page: '+page,(us||um||uc)&&'UTM: '+[us,um,uc].filter(Boolean).join(' / ')].filter(Boolean).join(' • ');
+    const id=uid(),co=company||name||email;S.leads.unshift({id,imp:batch,company:co,contact:name,phone:gv(o,['phone','phonenumber','tel','telephone','mobile']),email,source,disposition:S.cfg.disps[0],value:sum(sv),services:sv,notes,owner});
+    logEv('L'+id,'🌐 Website form submission'+(msg?': '+msg:''));
+    if(fu){const d=new Date(Date.now()+36e5);S.acts.unshift({id:uid(),imp:batch,type:'Follow-Up',title:'Respond to web lead: '+co,client:co,owner,dt:new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16),pri:'High',done:false})}add++});
+   if(add)S.cfg.lastImport={id:batch,type:'leads',count:add,at:new Date().toISOString()};aud('Web submissions: '+add+' leads, '+dup+' repeat, '+skip+' skipped');save('leads','acts','cfg');closeM();alert(add+' new lead(s) created'+(dup?', '+dup+' repeat submitter(s) logged on existing leads':'')+(skip?', '+skip+' skipped':'')+'.')}}
+});
+/* ===== Event delegation ===== */
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a]){auditClick(t);A[t.dataset.a](t.dataset.id,t)}else if(e.target===el('modal'))closeM()});
+document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id==='who')return render();if(!c)return;const id=t.dataset.id;
+ if(c==='ldisp'){S.leads.find(l=>l.id===id).disposition=t.value;logEv('L'+id,'Status → '+t.value);save('leads')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users')}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
+ if(c==='lown'){S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
+ if(c==='step')A.step(id,t)});
+document.addEventListener('input',e=>{if(e.target.dataset.c==='lq'){window._lq=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector('[data-c=lq]');i.focus();i.setSelectionRange(p,p)}});
+document.addEventListener('dragstart',e=>{const k=e.target.closest&&e.target.closest('[data-drag]');if(k){dragId=k.dataset.drag;e.dataTransfer.setData('text/plain',dragId)}});
+document.addEventListener('dragover',e=>{const c=e.target.closest&&e.target.closest('.col');if(c){e.preventDefault();c.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const c=e.target.closest&&e.target.closest('.col');if(c)c.classList.remove('over')});
+document.addEventListener('drop',e=>{const c=e.target.closest&&e.target.closest('.col');if(!c)return;e.preventDefault();const d=S.deals.find(x=>x.id===dragId);if(d){d.stage=c.dataset.stage;wonCheck(d);save('deals','accts')}});
+</script></body></html>
+
+</body></html>
