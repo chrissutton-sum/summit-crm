@@ -45,14 +45,14 @@ app.post('/api/me/password', requireAuth, async (req, res) => {
 
 // Admins create a login for a new (or existing) team member.
 app.post('/api/accounts', requireAuth, requireAdmin, async (req, res) => {
-  const { username, password, userId } = req.body || {};
+  const { username, password, userId, isAdmin } = req.body || {};
   if (!username || !password || !userId) return res.status(400).json({ error: 'username, password and userId required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
   const hash = await bcrypt.hash(password, 10);
   try {
     await pool.query(
       'INSERT INTO accounts (username, password_hash, user_id, is_admin) VALUES ($1, $2, $3, $4)',
-      [username.toLowerCase().trim(), hash, userId, false]
+      [username.toLowerCase().trim(), hash, userId, !!isAdmin]
     );
     res.json({ ok: true });
   } catch (e) {
@@ -60,6 +60,21 @@ app.post('/api/accounts', requireAuth, requireAdmin, async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'Could not create account' });
   }
+});
+
+// Admins promote/demote an existing login's admin flag (e.g. after changing a
+// team member's role in Settings). No-ops quietly if that user has no login yet.
+app.patch('/api/accounts/admin', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, isAdmin } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  await pool.query('UPDATE accounts SET is_admin = $1 WHERE user_id = $2', [!!isAdmin, userId]);
+  res.json({ ok: true });
+});
+
+// Admins remove a login entirely (e.g. when removing a team member).
+app.delete('/api/accounts/:userId', requireAuth, requireAdmin, async (req, res) => {
+  await pool.query('DELETE FROM accounts WHERE user_id = $1', [req.params.userId]);
+  res.json({ ok: true });
 });
 
 app.get('/api/accounts', requireAuth, requireAdmin, async (req, res) => {
