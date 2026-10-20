@@ -255,15 +255,15 @@ const A={
  async createLogin(id){const u=S.users.find(x=>x.id===id);if(!u)return;
   const username=(prompt('Username for '+u.name+':',u.name.toLowerCase().replace(/[^a-z0-9]/g,''))||'').trim();if(!username)return;
   const password=prompt('Temporary password (min 8 characters) — share this with '+u.name+', they can change it from Settings:')||'';if(password.length<8)return alert('Password must be at least 8 characters.');
-  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id})});const d=await r.json();
+  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id,isAdmin:u.level==='admin'})});const d=await r.json();
    if(!r.ok)return alert(d.error||'Could not create login.');
-   alert('Login created. Username: '+username+'  Password: '+password)}catch(e){alert('Could not reach the server.')}},
+   alert('Login created. Username: '+username+'  Password: '+password+(u.level==='admin'?'\n\nThey\'ll see admin controls once they sign in.':''))}catch(e){alert('Could not reach the server.')}},
  async changePw(){const oldPassword=el('pwOld').value,newPassword=el('pwNew').value;el('pwErr').textContent='';
   if(!oldPassword||newPassword.length<8){el('pwErr').textContent='Enter your current password and a new one of at least 8 characters.';return}
   try{const r=await api('/api/me/password',{method:'POST',body:JSON.stringify({oldPassword,newPassword})});const d=await r.json();
    if(!r.ok){el('pwErr').textContent=d.error||'Could not change password.';return}
    alert('Password changed.');render()}catch(e){el('pwErr').textContent='Could not reach the server.'}},
- delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users')},
+ async delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users');try{await api('/api/accounts/'+id,{method:'DELETE'})}catch(e){}},
  saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);save('cfg');alert('Rates saved')},
  saveLists(){const p=i=>el(i).value.split(',').map(s=>s.trim()).filter(Boolean),st=p('sst');if(st.length<3)return alert('Need at least 3 stages (…, Won, Lost).');S.cfg.stages=st;S.cfg.disps=p('sdp');S.cfg.onboard=p('sob');save('cfg');alert('Saved')},
  reset(){if(confirm('Reset ALL CRM data for everyone?')){S=DEF();save()}},
@@ -508,7 +508,7 @@ f.page_url.value=location.href;['utm_source','utm_medium','utm_campaign'].forEac
 /* ===== Event delegation ===== */
 document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a]){auditClick(t);A[t.dataset.a](t.dataset.id,t)}else if(e.target===el('modal'))closeM()});
 document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id==='who')return render();if(!c)return;const id=t.dataset.id;
- if(c==='ldisp'){S.leads.find(l=>l.id===id).disposition=t.value;logEv('L'+id,'Status → '+t.value);save('leads')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users')}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
+ if(c==='ldisp'){S.leads.find(l=>l.id===id).disposition=t.value;logEv('L'+id,'Status → '+t.value);save('leads')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
  if(c==='lown'){S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
  if(c==='step')A.step(id,t)});
 document.addEventListener('input',e=>{if(e.target.dataset.c==='lq'){window._lq=e.target.value;const p=e.target.selectionStart;render();const i=document.querySelector('[data-c=lq]');i.focus();i.setSelectionRange(p,p)}});
