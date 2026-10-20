@@ -125,7 +125,13 @@ async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').
   await boot()}catch(e){el('loginErr').textContent='Could not reach the server.'}}
 function save(...ks){lastLocal=Date.now();render();pushData()}
 async function pushData(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'}catch(e){if(TOKEN)el('sync').textContent='⚠ save failed'}}
-async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(Date.now()-lastLocal<4000)return;merge(d);el('sync').textContent='● shared';if(!quiet)render()}catch(e){}}
+async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(Date.now()-lastLocal<4000)return;
+ // Don't yank the rug out from under someone mid-type: a background sync used to
+ // re-render the whole screen every 10s regardless, which wiped out any text typed
+ // into a field (e.g. Settings → "+ Add user") that hadn't been saved yet. If the
+ // person is focused in a text field, hold this sync until they're done.
+ const a=document.activeElement,tag=a&&a.tagName;if(tag==='INPUT'||tag==='TEXTAREA')return;
+ merge(d);el('sync').textContent='● shared';if(!quiet)render()}catch(e){}}
 async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
