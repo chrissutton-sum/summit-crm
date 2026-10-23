@@ -67,7 +67,7 @@ const DEF=()=>({users:[{id:'u1',name:'Alex',role:'Managing Partner'},{id:'u2',na
   stages:['Qualification','Audit & Discovery','Proposal / Pitch','Negotiation','Closed Won','Closed Lost'],
   disps:['New Lead','Attempted Contact','Contacted','Discovery Scheduled','Proposal Sent','Converted','Lost'],
   onboard:['Signed retainer & deposit collected','Kickoff & strategy call scheduled','Website, GBP & analytics access granted','Logo & brand assets uploaded','30-day launch roadmap delivered']},
- leads:[],deals:[],acts:[],accts:[],invoices:[],recur:[],log:[],audit:[],deliv:[],props:[],tasks:[],files:[],templates:[
+ leads:[],deals:[],acts:[],accts:[],invoices:[],recur:[],log:[],audit:[],deliv:[],props:[],tasks:[],files:[],campaigns:[],templates:[
  {id:'t1',name:'Intro follow-up',subject:'Great connecting, {{contact}}',body:`Hi {{contact}},
 
 Thanks for taking the time to talk about {{client}}. I'd love to share how Summit Creative can help grow your visibility in the Treasure Valley. Would a quick call this week work?
@@ -109,7 +109,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -117,7 +117,7 @@ const PAGESZ=10;
 // right state var (leadPage or clientPage) without duplicating this logic.
 function paginate(items,page){const pages=Math.max(1,Math.ceil(items.length/PAGESZ));if(page>=pages)page=pages-1;if(page<0)page=0;return{items:items.slice(page*PAGESZ,page*PAGESZ+PAGESZ),page,pages}}
 function pager(page,pages,action){return pages<=1?'':`<div class="row" style="justify-content:center;gap:12px;margin:14px 0 4px"><button class="b2" ${page<=0?'disabled':''} data-a="${action}" data-id="-1">◀ Previous</button><span class="s" style="align-self:center">Page ${page+1} of ${pages}</span><button class="b2" ${page>=pages-1?'disabled':''} data-a="${action}" data-id="1">Next ▶</button></div>`}
-const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files'];
+const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files','campaigns'];
 const el=id=>document.getElementById(id);
 function merge(d){KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]})}
 
@@ -183,13 +183,13 @@ function form(title,fields,v,onSave){
  el('fsave').onclick=()=>{const o={};fields.forEach(f=>{const e=el('f_'+f.k);o[f.k]=f.t==='srv'?[...e.querySelectorAll('input:checked')].map(i=>i.value):f.t==='number'?Number(e.value)||0:e.value.trim()});{const lbl=title+': '+(o.company||o.name||o.title||o.client||'');if(onSave(o)!==false){aud(lbl);save('audit');closeM()}}}}
 const $$=n=>Math.round(n).toLocaleString();
 /* ===== Views ===== */
-const TABS=[['dash','📊','Analytics'],['leads','🎯','Leads'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
+const TABS=[['dash','📊','Analytics'],['camp','📣','Campaigns'],['leads','🎯','Leads'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
 function init(){el('nav').innerHTML=TABS.map(t=>`<div data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');render();runRecurring()}
 function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdue();
  const w=el('who'),cur=w.value||'ALL';w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
  el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
- const v={dash:vDash,leads:vLeads,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
+ const v={dash:vDash,camp:vCampaigns,leads:vLeads,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
 function vDash(){
  const D=S.deals.filter(mine),open=D.filter(isOpen),pipe=open.reduce((t,d)=>t+d.amount,0),wtd=open.reduce((t,d)=>t+d.amount*prob(d.stage)/100,0);
  const won=D.filter(d=>d.stage===WON()).reduce((t,d)=>t+d.amount,0),A=S.acts.filter(a=>!a.done&&mine(a)),od=A.filter(dueNow).length;
@@ -202,6 +202,19 @@ function vDash(){
  <div class="g2"><div class="card"><div class="t">Pipeline by Stage</div>${S.cfg.stages.map(s=>{const l=D.filter(d=>d.stage===s);return bar(`${esc(s)} (${l.length})`,$(l.reduce((t,d)=>t+d.amount,0)),1,s===WON()?'g':s===LOST()?'y':'').replace(/width:[^"]*/,`width:${Math.max(l.length?6:0,l.reduce((t,d)=>t+d.amount,0)/stMax*100)}%`)}).join('')}</div>
  <div class="card"><div class="t">Service Demand</div>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([s,c])=>bar(esc(s),c,cm)).join('')||'<p class="s">Tag services on leads or deals.</p>'}</div></div>
  <div class="card"><div class="t">Team Leaderboard</div>${uv.map(x=>bar(`${esc(x.u.name)} <span class="s">${esc(x.u.role)}</span>`,$(x.v),1,'y').replace(/width:[^"]*/,`width:${Math.max(x.v?5:0,x.v/um*100)}%`)).join('')}<div class="s">Unpaid invoices: <b style="color:var(--gold)">${$(unpaid)}</b></div></div>`}
+function vCampaigns(){
+ const{items:Cp,page,pages}=paginate(S.campaigns.filter(mine),campPage);campPage=page;
+ const head=`<div class="row" style="margin-bottom:10px"><h2>Campaigns</h2><div><button class="b2" data-a="csv" data-id="campaigns">⬇ CSV</button> <button data-a="newCamp">+ New Campaign</button></div></div>`;
+ return head+(Cp.map(c=>{
+  const leads=S.leads.filter(l=>l.campaign===c.id),deals=S.deals.filter(d=>d.campaign===c.id),won=deals.filter(d=>d.stage===WON());
+  const pipe=deals.filter(isOpen).reduce((t,d)=>t+d.amount,0),wonVal=won.reduce((t,d)=>t+d.amount,0),cpl=leads.length?Math.round((Number(c.budget)||0)/leads.length):0;
+  const badgeCls=c.status==='Active'?'o':c.status==='Paused'?'r':'';
+  return`<div class="card"><div class="row"><div><div class="t">${esc(c.name)}</div><div class="s">📣 ${esc(c.channel||'—')} • ${esc(uName(c.owner))}${c.start||c.end?' • '+esc(c.start||'?')+' → '+esc(c.end||'ongoing'):''}</div></div><span class="badge ${badgeCls}">${esc(c.status)}</span></div>
+ <div class="row s" style="margin-top:8px;color:var(--cyan)"><b>${leads.length} lead${leads.length===1?'':'s'}</b><b>${deals.length} deal${deals.length===1?'':'s'}</b><b>${won.length} won</b></div>
+ <div class="row s" style="margin-top:2px"><span>Budget ${$(c.budget||0)}</span><span>Pipeline ${$(pipe)}</span><span>Won value ${$(wonVal)}</span>${leads.length?`<span>Cost/lead ${$(cpl)}</span>`:''}</div>
+ ${c.notes?`<p class="s" style="margin-top:6px">📝 ${esc(c.notes)}</p>`:''}
+ <div class="acts"><button class="b2" data-a="hist" data-id="M${c.id}">🕒</button><button class="b2" data-a="files" data-id="M${c.id}">📎</button><button class="b2" data-a="editCamp" data-id="${c.id}">✏️</button><button class="bd" data-a="delCamp" data-id="${c.id}">🗑️</button></div></div>`
+ }).join('')||'<div class="card s">No campaigns yet. Create one, then tag leads to it from the lead form so results roll up here.</div>')+pager(page,pages,'campPg')}
 function vLeads(){
  const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
  const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button data-a="newLead">+ New Lead</button></div></div>
@@ -219,6 +232,7 @@ function vLeads(){
  const{items:Lp,page,pages}=paginate(L,leadPage);leadPage=page;
  return head+`<div class="row" style="margin:-2px 0 10px">${backBtn}${!q?`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`:''}</div>`+(Lp.map(l=>`<div class="card"><div class="row"><div><div class="t">${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
  <div class="row" style="margin-top:8px"><div style="flex:1"><label>Status</label><select data-c="ldisp" data-id="${l.id}">${optL(S.cfg.disps,l.disposition)}</select></div><div style="flex:1"><label>Owner</label><select data-c="lown" data-id="${l.id}">${optU(l.owner)}</select></div></div>
+ ${l.campaign?`<p class="s" style="margin-top:4px">📣 ${esc(nameOf(l.campaign))}</p>`:''}
  ${l.notes?`<p class="s" style="margin-top:6px">📝 ${esc(l.notes)}</p>`:''}<div>${l.services.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
  <div class="acts"><button class="bg" data-a="prop" data-id="L${l.id}">📄 Quote</button><button data-a="convert" data-id="${l.id}">🚀 To Deal</button><button class="b2" data-a="callLead" data-id="${l.id}">🎥 Call</button>${l.phone?`<a class="btn b2" href="${zoomPhoneHref(l.phone)}">☎️ Zoom Phone</a><a class="btn b2" href="tel:${esc(l.phone)}">📞</a>`:''}${l.email?`<a class="btn b2" href="mailto:${esc(l.email)}">✉️</a>`:''}<button class="b2" data-a="follow" data-id="${l.id}">📅 Follow-up</button><button class="b2" data-a="emailLead" data-id="${l.id}">✉️ Email</button><button class="b2" data-a="hist" data-id="L${l.id}">🕒</button><button class="b2" data-a="files" data-id="L${l.id}">📎</button><button class="b2" data-a="editLead" data-id="${l.id}">✏️</button><button class="bd" data-a="delLead" data-id="${l.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No leads.</div>')+pager(page,pages,'leadPg')}
 function vDeals(){
@@ -251,6 +265,8 @@ function vSet(){
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
 /* ===== Actions ===== */
 const owners=()=>S.users.map(u=>[u.id,u.name]);
+const camps=()=>[['','— No campaign —']].concat(S.campaigns.map(c=>[c.id,c.name]));
+const CSTAT=['Planned','Active','Paused','Completed'];
 const A={
  tab(id){tab=id;render();scrollTo(0,0)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
  alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${esc(uName(a.owner))} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
@@ -259,11 +275,16 @@ const A={
  leadFolderBack(){leadFolder=null;leadPage=0;render();scrollTo(0,0)},
  leadPg(dir){leadPage+=+dir;render();scrollTo(0,0)},
  clientPg(dir){clientPage+=+dir;render();scrollTo(0,0)},
+ campPg(dir){campPage+=+dir;render();scrollTo(0,0)},
+ newCamp(){A.editCamp()},
+ editCamp(id){const c=S.campaigns.find(x=>x.id===id)||{owner:S.users[0]?.id,status:'Planned',channel:SOURCES[0]};
+  form(id?'Edit Campaign':'New Campaign',[{k:'name',l:'Campaign name'},{k:'channel',l:'Channel',t:'sel',o:SOURCES},{k:'status',l:'Status',t:'sel',o:CSTAT},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'start',l:'Start date',t:'date'},{k:'end',l:'End date',t:'date'},{k:'budget',l:'Budget ($)',t:'number'},{k:'notes',l:'Notes',t:'area'}],c,o=>{if(!o.name)return alert('Campaign name required')&&false;if(id)Object.assign(c,o);else S.campaigns.unshift({id:uid(),...o});save('campaigns')})},
+ delCamp(id){if(!confirm('Delete this campaign? Leads/deals tagged to it will just show no campaign.'))return;S.campaigns=S.campaigns.filter(c=>c.id!==id);S.leads.forEach(l=>{if(l.campaign===id)l.campaign=''});S.deals.forEach(d=>{if(d.campaign===id)d.campaign=''});save('campaigns','leads','deals')},
  editLead(id){const l=S.leads.find(x=>x.id===id)||{owner:S.users[0]?.id,disposition:S.cfg.disps[0],services:[]};
-  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
+  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'campaign',l:'Campaign',t:'sel',o:camps()},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
  delLead(id){if(confirm('Delete lead?')){S.leads=S.leads.filter(l=>l.id!==id);save('leads')}},
  convert(id){const l=S.leads.find(x=>x.id===id);if(!l)return;
-  S.deals.unshift({id:uid(),name:`${l.company} – ${l.services.slice(0,2).join(' & ')||'Marketing'}`,source:l.source||'Unknown',account:l.company,email:l.email,phone:l.phone,contact:l.contact,owner:l.owner,stage:S.cfg.stages[0],amount:l.value||sum(l.services)||2500,close:new Date(Date.now()+12096e5).toISOString().slice(0,10),services:[...l.services]});
+  S.deals.unshift({id:uid(),name:`${l.company} – ${l.services.slice(0,2).join(' & ')||'Marketing'}`,source:l.source||'Unknown',campaign:l.campaign||'',account:l.company,email:l.email,phone:l.phone,contact:l.contact,owner:l.owner,stage:S.cfg.stages[0],amount:l.value||sum(l.services)||2500,close:new Date(Date.now()+12096e5).toISOString().slice(0,10),services:[...l.services]});
   l.disposition='Converted';if(!S.cfg.disps.includes('Converted'))l.disposition=S.cfg.disps[S.cfg.disps.length-2]||l.disposition;save('leads','deals');tab='deals';render()},
  newDeal(){A.editDeal()},
  editDeal(id){const d=S.deals.find(x=>x.id===id)||{owner:S.users[0]?.id,stage:S.cfg.stages[0],services:[]};
@@ -309,6 +330,7 @@ const A={
   if(kind==='leads')rows=[['Company','Contact','Phone','Email','Owner','Status','Value','Services']].concat(S.leads.map(l=>[l.company,l.contact,l.phone,l.email,uName(l.owner),l.disposition,l.value,l.services.join('; ')]));
   if(kind==='deals')rows=[['Deal','Client','Owner','Stage','Amount','Prob%','Close','Services']].concat(S.deals.map(d=>[d.name,d.account,uName(d.owner),d.stage,d.amount,prob(d.stage),d.close,(d.services||[]).join('; ')]));
   if(kind==='invoices')rows=[['Invoice','Client','Description','Amount','Date','Due','Paid']].concat(S.invoices.map(i=>['INV-'+i.num,i.client,i.desc,i.amount,i.date,i.due,i.paid?'Yes':'No']));
+  if(kind==='campaigns')rows=[['Name','Channel','Status','Owner','Start','End','Budget','Leads','Deals','Won','Pipeline','WonValue','CostPerLead']].concat(S.campaigns.map(c=>{const leads=S.leads.filter(l=>l.campaign===c.id),deals=S.deals.filter(d=>d.campaign===c.id),won=deals.filter(d=>d.stage===WON()),pipe=deals.filter(isOpen).reduce((t,d)=>t+d.amount,0),wonVal=won.reduce((t,d)=>t+d.amount,0);return[c.name,c.channel,c.status,uName(c.owner),c.start,c.end,c.budget,leads.length,deals.length,won.length,pipe,wonVal,leads.length?Math.round((Number(c.budget)||0)/leads.length):0]}));
   doDownload(`summit_${name}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'))}
 };
 function mkAcct(o){return{id:uid(),status:'Active',created:today(),name:o.name,contact:o.contact||'',phone:o.phone||'',owner:o.owner,retainer:o.retainer||0,steps:S.cfg.onboard.map(t=>({id:uid(),text:t,done:false}))}}
@@ -387,7 +409,7 @@ function slackNotify(){/* Slack notifications are not wired up in the standalone
 const ME=()=>S.users.find(u=>u.id===MYID),meName=()=>ME()?.name||MYNAME||'Someone',isStaff=()=>ME()?.level==='staff',hidden=t=>isStaff()&&['inv','set','ins'].includes(t);
 const logEv=(ref,text)=>{S.log.unshift({id:uid(),ref,text,by:meName(),at:new Date().toISOString()});S.log=S.log.slice(0,600)};
 const aud=text=>{S.audit.unshift({at:new Date().toISOString(),by:meName(),text});S.audit=S.audit.slice(0,300)};
-function nameOf(id){const f=[[S.leads,'company'],[S.deals,'name'],[S.accts,'name'],[S.tasks,'title'],[S.deliv,'title'],[S.props,'client'],[S.users,'name'],[S.recur,'client'],[S.invoices,'client']];for(const[a,k]of f){const x=a.find(r=>r.id===id||'L'+r.id===id||'D'+r.id===id||'C'+r.id===id);if(x)return x[k]}return id||''}
+function nameOf(id){const f=[[S.leads,'company'],[S.deals,'name'],[S.accts,'name'],[S.tasks,'title'],[S.deliv,'title'],[S.props,'client'],[S.users,'name'],[S.recur,'client'],[S.invoices,'client'],[S.campaigns,'name']];for(const[a,k]of f){const x=a.find(r=>r.id===id||'L'+r.id===id||'D'+r.id===id||'C'+r.id===id||'M'+r.id===id);if(x)return x[k]}return id||''}
 function auditClick(t){const a=t.dataset.a;if(/^(del|mv|convert|paid|actDone|reset|save|addUser|accept|togRecur|togDeliv)/.test(a))aud(a+' · '+nameOf(t.dataset.id))}
 function lostCheck(d){if(d.stage===LOST()&&!d.lossReason)d.lossReason=(prompt('Why was this deal lost? (price, timing, competitor, no response, other)')||'Unspecified').trim();if(d.stage!==LOST())delete d.lossReason}
 const fmt=iso=>new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
@@ -437,8 +459,8 @@ Object.assign(A,{
  addLink(ref){const n=el('fln').value.trim(),u=el('flu').value.trim();if(!n||!/^https?:\/\//i.test(u))return alert('Enter a name and a full http(s) link.');S.files.push({id:uid(),ref,name:n,url:u});logEv(ref,'🔗 Linked '+n);save('files');A.files(ref)},
  async delFile(id){const f=S.files.find(x=>x.id===id);if(!f||!confirm('Remove '+f.name+'?'))return;if(f.aid&&AS)try{await AS.delete(f.aid)}catch(e){}S.files=S.files.filter(x=>x.id!==id);save('files');A.files(window._fr)},
  goto(t){closeM();A.tab(t)},
- search(){openModal(`<input id="sq" placeholder="Search leads, deals, clients, invoices, tasks…" style="margin-bottom:10px"><div id="sr"></div>`);const sq=el('sq');sq.focus();sq.oninput=()=>{const q=sq.value.toLowerCase().trim();if(q.length<2){el('sr').innerHTML='';return}const R=[];const add=(tab,ic,label,sub)=>{if(!hidden(tab)&&(label+' '+sub).toLowerCase().includes(q))R.push(`<button class="b2" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-a="goto" data-id="${tab}">${ic} <b>${esc(label)}</b> <span class="s">${esc(sub)}</span></button>`)};
-   S.leads.forEach(l=>add('leads','🎯',l.company,l.contact+' '+l.email+' '+l.services.join(' ')+' '+l.notes));S.deals.forEach(d=>add('deals','💼',d.name,d.account+' '+d.stage));S.accts.forEach(a=>add('clients','🚀',a.name,a.contact));S.invoices.forEach(i=>add('inv','🧾','INV-'+i.num,i.client+' '+i.desc));S.tasks.forEach(k=>add('tasks','✅',k.title,''));S.acts.forEach(a=>add('cal','📅',a.title,a.client));S.deliv.forEach(d=>add('tasks','📦',d.title,nameOf('C'+d.acct)));
+ search(){openModal(`<input id="sq" placeholder="Search leads, deals, campaigns, clients, invoices, tasks…" style="margin-bottom:10px"><div id="sr"></div>`);const sq=el('sq');sq.focus();sq.oninput=()=>{const q=sq.value.toLowerCase().trim();if(q.length<2){el('sr').innerHTML='';return}const R=[];const add=(tab,ic,label,sub)=>{if(!hidden(tab)&&(label+' '+sub).toLowerCase().includes(q))R.push(`<button class="b2" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-a="goto" data-id="${tab}">${ic} <b>${esc(label)}</b> <span class="s">${esc(sub)}</span></button>`)};
+   S.leads.forEach(l=>add('leads','🎯',l.company,l.contact+' '+l.email+' '+l.services.join(' ')+' '+l.notes));S.deals.forEach(d=>add('deals','💼',d.name,d.account+' '+d.stage));S.campaigns.forEach(c=>add('camp','📣',c.name,c.channel+' '+c.status));S.accts.forEach(a=>add('clients','🚀',a.name,a.contact));S.invoices.forEach(i=>add('inv','🧾','INV-'+i.num,i.client+' '+i.desc));S.tasks.forEach(k=>add('tasks','✅',k.title,''));S.acts.forEach(a=>add('cal','📅',a.title,a.client));S.deliv.forEach(d=>add('tasks','📦',d.title,nameOf('C'+d.acct)));
    el('sr').innerHTML=R.slice(0,25).join('')||'<p class="s">No matches.</p>'}}
 });
 
