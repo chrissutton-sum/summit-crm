@@ -25,6 +25,8 @@ label{display:block;font-size:.7rem;text-transform:uppercase;color:var(--mut);ma
 .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}
 .pill{font-size:.68rem;background:var(--bg);color:var(--cyan);border:1px solid var(--bd);padding:2px 7px;border-radius:4px;margin:2px 2px 0 0;display:inline-block}
 .badge{font-size:.68rem;padding:3px 8px;border-radius:6px;font-weight:700;border:1px solid var(--blue);background:rgba(37,99,235,.25);color:#93c5fd}.badge.r{border-color:var(--bad);background:rgba(239,68,68,.2);color:#fca5a5}.badge.o{border-color:var(--ok);background:rgba(16,185,129,.2);color:#6ee7b7}
+.folders{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}@media(min-width:640px){.folders{grid-template-columns:repeat(3,1fr)}}
+.folder{cursor:pointer}.folder:active{opacity:.75}.folder .t{font-size:.95rem}
 .kan{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px}
 .col{min-width:270px;max-width:270px;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px}.col.over{border:2px dashed var(--cyan)}
 .col h3{font-size:.8rem;text-transform:uppercase;color:var(--cyan);display:flex;justify-content:space-between;margin-bottom:8px}
@@ -107,7 +109,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null;
 const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files'];
 const el=id=>document.getElementById(id);
 function merge(d){KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]})}
@@ -194,9 +196,20 @@ function vDash(){
  <div class="card"><div class="t">Service Demand</div>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([s,c])=>bar(esc(s),c,cm)).join('')||'<p class="s">Tag services on leads or deals.</p>'}</div></div>
  <div class="card"><div class="t">Team Leaderboard</div>${uv.map(x=>bar(`${esc(x.u.name)} <span class="s">${esc(x.u.role)}</span>`,$(x.v),1,'y').replace(/width:[^"]*/,`width:${Math.max(x.v?5:0,x.v/um*100)}%`)).join('')}<div class="s">Unpaid invoices: <b style="color:var(--gold)">${$(unpaid)}</b></div></div>`}
 function vLeads(){
- const q=(window._lq||'').toLowerCase(),L=S.leads.filter(l=>mine(l)&&(!q||(l.company+l.contact+l.services.join()).toLowerCase().includes(q)));
- return`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button data-a="newLead">+ New Lead</button></div></div>
- <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`+(L.map(l=>`<div class="card"><div class="row"><div><div class="t">${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
+ const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
+ const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button data-a="newLead">+ New Lead</button></div></div>
+ <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`;
+ // No search in progress and no folder open: show one folder per lead status
+ // instead of every lead at once, so a long pipeline doesn't crowd the screen.
+ if(!q&&!leadFolder){
+  const buckets=S.cfg.disps.slice();
+  const extra=[...new Set(mineLeads.map(l=>l.disposition).filter(d=>!buckets.includes(d)))];
+  return head+`<div class="folders">`+buckets.concat(extra).map(st=>{const n=mineLeads.filter(l=>l.disposition===st).length;
+   return`<div class="card folder" data-a="openLeadFolder" data-id="${esc(st)}"><div class="t">📁 ${esc(st)}</div><div class="s">${n} lead${n===1?'':'s'}</div></div>`}).join('')+`</div>`
+   +(mineLeads.length?'':'<div class="card s" style="margin-top:12px">No leads yet.</div>')}
+ const L=mineLeads.filter(l=>q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
+ const backBtn=!q?`<button class="b2" data-a="leadFolderBack">← All folders</button>`:'';
+ return head+`<div class="row" style="margin:-2px 0 10px">${backBtn}${!q?`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`:''}</div>`+(L.map(l=>`<div class="card"><div class="row"><div><div class="t">${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
  <div class="row" style="margin-top:8px"><div style="flex:1"><label>Status</label><select data-c="ldisp" data-id="${l.id}">${optL(S.cfg.disps,l.disposition)}</select></div><div style="flex:1"><label>Owner</label><select data-c="lown" data-id="${l.id}">${optU(l.owner)}</select></div></div>
  ${l.notes?`<p class="s" style="margin-top:6px">📝 ${esc(l.notes)}</p>`:''}<div>${l.services.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
  <div class="acts"><button class="bg" data-a="prop" data-id="L${l.id}">📄 Quote</button><button data-a="convert" data-id="${l.id}">🚀 To Deal</button><button class="b2" data-a="callLead" data-id="${l.id}">🎥 Call</button>${l.phone?`<a class="btn b2" href="${zoomPhoneHref(l.phone)}">☎️ Zoom Phone</a><a class="btn b2" href="tel:${esc(l.phone)}">📞</a>`:''}${l.email?`<a class="btn b2" href="mailto:${esc(l.email)}">✉️</a>`:''}<button class="b2" data-a="follow" data-id="${l.id}">📅 Follow-up</button><button class="b2" data-a="emailLead" data-id="${l.id}">✉️ Email</button><button class="b2" data-a="hist" data-id="L${l.id}">🕒</button><button class="b2" data-a="files" data-id="L${l.id}">📎</button><button class="b2" data-a="editLead" data-id="${l.id}">✏️</button><button class="bd" data-a="delLead" data-id="${l.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No leads.</div>')}
@@ -233,6 +246,8 @@ const A={
  tab(id){tab=id;render();scrollTo(0,0)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
  alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${esc(uName(a.owner))} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
  newLead(){A.editLead()},
+ openLeadFolder(id){leadFolder=id;render();scrollTo(0,0)},
+ leadFolderBack(){leadFolder=null;render();scrollTo(0,0)},
  editLead(id){const l=S.leads.find(x=>x.id===id)||{owner:S.users[0]?.id,disposition:S.cfg.disps[0],services:[]};
   form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
  delLead(id){if(confirm('Delete lead?')){S.leads=S.leads.filter(l=>l.id!==id);save('leads')}},
