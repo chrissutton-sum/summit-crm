@@ -407,7 +407,7 @@ Object.assign(A,{
 let AS=null,MCP=false;const SOURCES=['Website','Referral','Event','Cold outreach','Google / SEO','Social','Partner','Unknown'];
 function slackNotify(){/* Slack notifications are not wired up in the standalone version. */}
 const ME=()=>S.users.find(u=>u.id===MYID),meName=()=>ME()?.name||MYNAME||'Someone',isStaff=()=>ME()?.level==='staff',hidden=t=>isStaff()&&['inv','set','ins'].includes(t);
-const logEv=(ref,text)=>{S.log.unshift({id:uid(),ref,text,by:meName(),at:new Date().toISOString()});S.log=S.log.slice(0,600)};
+const logEv=(ref,text,loc)=>{S.log.unshift({id:uid(),ref,text,by:meName(),at:new Date().toISOString(),...(loc?{loc}:{})});S.log=S.log.slice(0,600)};
 const aud=text=>{S.audit.unshift({at:new Date().toISOString(),by:meName(),text});S.audit=S.audit.slice(0,300)};
 function nameOf(id){const f=[[S.leads,'company'],[S.deals,'name'],[S.accts,'name'],[S.tasks,'title'],[S.deliv,'title'],[S.props,'client'],[S.users,'name'],[S.recur,'client'],[S.invoices,'client'],[S.campaigns,'name']];for(const[a,k]of f){const x=a.find(r=>r.id===id||'L'+r.id===id||'D'+r.id===id||'C'+r.id===id||'M'+r.id===id);if(x)return x[k]}return id||''}
 function auditClick(t){const a=t.dataset.a;if(/^(del|mv|convert|paid|actDone|reset|save|addUser|accept|togRecur|togDeliv)/.test(a))aud(a+' · '+nameOf(t.dataset.id))}
@@ -433,8 +433,19 @@ function vIns(){const AC=S.accts.filter(a=>a.status!=='Churned'),mrr=AC.reduce((
  <div class="card"><div class="t">Why we lose deals</div>${Object.entries(lr).map(([k,v])=>bar(esc(k),v,lm,'y')).join('')||'<p class="s">No lost deals yet.</p>'}</div></div>`}
 const dtStr=x=>x.replace(/[-:]/g,'').slice(0,13)+'00';
 Object.assign(A,{
- hist(ref){const L=S.log.filter(l=>l.ref===ref);openModal(`<h3>🕒 ${esc(nameOf(ref))} — history</h3><div class="row" style="margin:10px 0"><input id="nn" placeholder="Log a call, note, decision…" style="flex:1;margin:0"><button data-a="addNote" data-id="${ref}">+ Note</button></div>${L.map(l=>`<div class="s" style="margin:7px 0;color:var(--tx)">• ${esc(l.text)}<div class="s">${esc(l.by)} • ${esc(fmt(l.at))}</div></div>`).join('')||'<p class="s">No history yet.</p>'}<button class="b2" data-a="close">Close</button>`)},
+ hist(ref){const L=S.log.filter(l=>l.ref===ref);openModal(`<h3>🕒 ${esc(nameOf(ref))} — history</h3><div class="row" style="margin:10px 0"><input id="nn" placeholder="Log a call, note, decision…" style="flex:1;margin:0"><button data-a="addNote" data-id="${ref}">+ Note</button></div><button class="b2" style="margin:-4px 0 10px;width:100%" data-a="checkin" data-id="${ref}">📍 Check in here</button>${L.map(l=>`<div class="s" style="margin:7px 0;color:var(--tx)">• ${esc(l.text)}${l.loc?` <a href="https://maps.google.com/?q=${l.loc.lat},${l.loc.lon}" target="_blank" rel="noopener" style="color:var(--cyan)">📍 View map</a>`:''}<div class="s">${esc(l.by)} • ${esc(fmt(l.at))}</div></div>`).join('')||'<p class="s">No history yet.</p>'}<button class="b2" data-a="close">Close</button>`)},
  addNote(ref){const t=el('nn').value.trim();if(!t)return;logEv(ref,'📝 '+t);save('log');A.hist(ref)},
+ // Stamps a one-time GPS coordinate onto this record's history (e.g. "visited
+ // this lead from here"). No background/continuous tracking -- this only runs
+ // when someone taps the button, and only while this tab/app is open and the
+ // browser's own location permission prompt has been allowed.
+ checkin(ref){if(!navigator.geolocation)return alert("This browser doesn't support location.");
+  navigator.geolocation.getCurrentPosition(
+   pos=>{const lat=+pos.coords.latitude.toFixed(5),lon=+pos.coords.longitude.toFixed(5),acc=Math.round(pos.coords.accuracy||0);
+    logEv(ref,'📍 Checked in'+(acc?' (±'+acc+'m)':''),{lat,lon});save('log');A.hist(ref)},
+   err=>alert(err.code===1?'Location permission was denied. Allow location access for this site and try again.':'Could not get your location ('+(err.message||'unknown error')+').'),
+   {enableHighAccuracy:true,timeout:12000}
+  )},
  deliv(id){window._da=id;const D=S.deliv.filter(d=>d.acct===id).sort(dueSort);openModal(`<h3>📦 ${esc(nameOf('C'+id))} — deliverables</h3>${D.map(d=>`<div class="row" style="align-items:center;margin:8px 0;${d.done?'opacity:.5':''}"><div><b>${esc(d.title)}</b><div class="s">${esc(uName(d.owner))} • due ${esc(d.due||'—')}${d.repeat==='Monthly'?' • 🔁':''}</div></div><div><button class="b2" data-a="togDeliv" data-id="${d.id}">${d.done?'↩':'✅'}</button> <button class="bd" data-a="delDeliv" data-id="${d.id}">🗑️</button></div></div>`).join('')||'<p class="s">None yet.</p>'}<div class="acts"><button data-a="addDeliv" data-id="${id}">+ Deliverable</button><button class="b2" data-a="close">Close</button></div>`)},
  addDeliv(id){form('New Deliverable',[{k:'title',l:'Deliverable (e.g. Monthly SEO report)'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'due',l:'Due',t:'date'},{k:'repeat',l:'Repeat',t:'sel',o:['One-time','Monthly']}],{owner:S.users[0]?.id,due:today()},o=>{if(!o.title)return alert('Title required')&&false;S.deliv.push({id:uid(),acct:id,...o,done:false});save('deliv');setTimeout(()=>A.deliv(id),0)})},
  togDeliv(id){const d=S.deliv.find(x=>x.id===id);d.done=!d.done;if(d.done){d.doneAt=new Date().toISOString();logEv('C'+d.acct,'📦 Delivered: '+d.title);if(d.repeat==='Monthly'&&d.due&&!S.deliv.some(x=>x.prev===d.id))S.deliv.push({...d,id:uid(),prev:d.id,done:false,doneAt:null,due:addMonth(d.due,d.due.slice(8,10))})}save('deliv');if(el('modal').style.display==='block'&&window._da)A.deliv(window._da)},
