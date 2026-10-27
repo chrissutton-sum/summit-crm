@@ -82,6 +82,15 @@ app.get('/api/accounts', requireAuth, requireAdmin, async (req, res) => {
   res.json(rows);
 });
 
+// TEMPORARY, one-time use: promotes the calling account to admin. Needed because
+// the original admin login (Alex) was removed as a team member, leaving no
+// working admin account to grant anyone else access from Settings. Remove this
+// route again right after using it once.
+app.post('/api/bootstrap-admin-once', requireAuth, async (req, res) => {
+  await pool.query('UPDATE accounts SET is_admin = true WHERE id = $1', [req.account.accountId]);
+  res.json({ ok: true });
+});
+
 // ---- CRM data (single shared JSON blob, same shape the old claude.ai db doc used) ----
 app.get('/api/data', requireAuth, async (req, res) => {
   const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
