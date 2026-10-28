@@ -62,9 +62,12 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 const KEY='summit_crm_v4', uid=()=>Math.random().toString(36).slice(2,10), $=n=>'$'+Math.round(n||0).toLocaleString();
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function timeAgo(ms){const s=Math.max(0,Math.round((Date.now()-ms)/1000));if(s<60)return 'just now';const m=Math.round(s/60);if(m<60)return m+'m ago';const h=Math.round(m/60);if(h<24)return h+'h ago';return Math.round(h/24)+'d ago'}
-const SRV=['SEO','AEO','GEO','CTV','Social Media','Podcasts','Logo Design','Live Events'];
+const SRV=['SEO','AEO','GEO','CTV','Social Media','Podcasts','Logo Design','Live Events','SBDC: Basic Website','SBDC: Logo Design','SBDC: Social Media Setup','SBDC: Social Media Support – Starter','SBDC: Social Media Support – Growth','SBDC: Social Media Support – Premium'];
+// Services default to monthly/recurring pricing unless listed here as false (one-time flat fee).
+const ONE_TIME_DEFAULT={'SBDC: Basic Website':false,'SBDC: Logo Design':false,'SBDC: Social Media Setup':false};
 const DEF=()=>({users:[{id:'u1',name:'Alex',role:'Managing Partner'},{id:'u2',name:'Sarah',role:'Account Executive'},{id:'u3',name:'Jordan',role:'Events & Media'}],
- cfg:{rates:{SEO:1200,AEO:850,GEO:850,CTV:2200,'Social Media':950,Podcasts:900,'Logo Design':750,'Live Events':2500},
+ cfg:{rates:{SEO:1200,AEO:850,GEO:850,CTV:2200,'Social Media':950,Podcasts:900,'Logo Design':750,'Live Events':2500,'SBDC: Basic Website':350,'SBDC: Logo Design':350,'SBDC: Social Media Setup':350,'SBDC: Social Media Support – Starter':500,'SBDC: Social Media Support – Growth':750,'SBDC: Social Media Support – Premium':1250},
+  monthly:{'SBDC: Basic Website':false,'SBDC: Logo Design':false,'SBDC: Social Media Setup':false},
   stages:['Qualification','Audit & Discovery','Proposal / Pitch','Negotiation','Closed Won','Closed Lost'],
   disps:['New Lead','Attempted Contact','Contacted','Discovery Scheduled','Proposal Sent','Converted','Lost'],
   onboard:['Signed retainer & deposit collected','Kickoff & strategy call scheduled','Website, GBP & analytics access granted','Logo & brand assets uploaded','30-day launch roadmap delivered']},
@@ -219,7 +222,12 @@ function handleGoogleRedirect(){
 })();
 /* ===== Helpers ===== */
 const uName=id=>(S.users.find(u=>u.id===id)||{name:'Unassigned'}).name;
-const rate=s=>Number(S.cfg.rates[s])||800, sum=a=>(a||[]).reduce((t,s)=>t+rate(s),0);
+const rate=s=>Number(S.cfg.rates[s])||800;
+const isMonthly=s=>{const m=S.cfg.monthly||{};return m[s]!==undefined?!!m[s]:(ONE_TIME_DEFAULT[s]!==undefined?!ONE_TIME_DEFAULT[s]:true)};
+// Monthly value only counts recurring services — a one-time service price
+// (e.g. an SBDC Special setup fee) shouldn't inflate a lead/deal's MRR.
+const sum=a=>(a||[]).filter(isMonthly).reduce((t,s)=>t+rate(s),0);
+const oneTimeSum=a=>(a||[]).filter(s=>!isMonthly(s)).reduce((t,s)=>t+rate(s),0);
 const WON=()=>S.cfg.stages[S.cfg.stages.length-2], LOST=()=>S.cfg.stages[S.cfg.stages.length-1];
 const isOpen=d=>d.stage!==WON()&&d.stage!==LOST();
 const prob=st=>{const i=S.cfg.stages.indexOf(st),n=S.cfg.stages.length;return st===WON()?100:st===LOST()?0:Math.round(10+(i/(n-2))*80)};
@@ -236,7 +244,7 @@ function form(title,fields,v,onSave){
  fields.forEach(f=>{const val=v[f.k]??'';h+=`<label>${esc(f.l)}</label>`;
   if(f.t==='sel')h+=`<select id="f_${f.k}">${f.o.map(o=>{const[a,b]=Array.isArray(o)?o:[o,o];return`<option value="${esc(a)}" ${a===val?'selected':''}>${esc(b)}</option>`}).join('')}</select>`;
   else if(f.t==='area')h+=`<textarea id="f_${f.k}" rows="3">${esc(val)}</textarea>`;
-  else if(f.t==='srv')h+=`<div class="chk" id="f_${f.k}">${SRV.map(s=>`<label><input type="checkbox" value="${esc(s)}" ${(val||[]).includes(s)?'checked':''}>${esc(s)} (${$$(rate(s))})</label>`).join('')}</div>`;
+  else if(f.t==='srv')h+=`<div class="chk" id="f_${f.k}">${SRV.map(s=>`<label><input type="checkbox" value="${esc(s)}" ${(val||[]).includes(s)?'checked':''}>${esc(s)} (${$$(rate(s))}${isMonthly(s)?'/mo':' one-time'})</label>`).join('')}</div>`;
   else h+=`<input id="f_${f.k}" type="${f.t||'text'}" value="${esc(val)}" placeholder="${esc(f.p||'')}">`});
  h+=`<div class="row"><button id="fsave" style="flex:1">Save</button><button class="b2" data-a="close">Cancel</button></div>`;
  openModal(h);
@@ -350,7 +358,7 @@ function vSet(){
  <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
  <details style="margin-top:12px"><summary class="s" style="cursor:pointer">Or paste a calendar link (Outlook, Apple Calendar, etc.)</summary>
  <label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://..." value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Google Calendar also works this way if you'd rather not use the sign-in button: Settings → (pick your calendar) → "Secret address in iCal format". Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</details></div>
- <div class="card"><div class="t">Service Rate Card ($/mo)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}"></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
+ <div class="card"><div class="t">Service Rate Card</div><div class="s" style="margin-bottom:4px">Set each service's price and whether it bills monthly (recurring) or one-time.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><div class="row" style="align-items:center;gap:6px"><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}" style="flex:1"><label style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:.84rem"><input type="checkbox" class="rtm" data-s="${esc(s)}" ${isMonthly(s)?'checked':''}>Monthly</label></div></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
 /* ===== Actions ===== */
@@ -431,7 +439,9 @@ const A={
  async disconnectGoogle(){if(!confirm('Disconnect your Google Calendar?'))return;try{await api('/api/google/disconnect',{method:'POST'});delete calFeeds[MYID];await refreshGoogleStatus();render()}catch(e){alert('Could not disconnect.')}},
  callLead(id){const l=S.leads.find(x=>x.id===id);if(l)zoomCall(l.owner)},
  callAcct(id){const a=S.accts.find(x=>x.id===id);if(a)zoomCall(a.owner)},
- saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);save('cfg');alert('Rates saved')},
+ saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);
+  S.cfg.monthly=S.cfg.monthly||{};document.querySelectorAll('.rtm').forEach(c=>S.cfg.monthly[c.dataset.s]=c.checked);
+  save('cfg');alert('Rates saved')},
  saveLists(){const p=i=>el(i).value.split(',').map(s=>s.trim()).filter(Boolean),st=p('sst');if(st.length<3)return alert('Need at least 3 stages (…, Won, Lost).');S.cfg.stages=st;S.cfg.disps=p('sdp');S.cfg.onboard=p('sob');save('cfg');alert('Saved')},
  reset(){if(confirm('Reset ALL CRM data for everyone?')){S=DEF();save()}},
  csv(kind){let rows,name=kind;
@@ -465,17 +475,17 @@ function propOpen(id){let name='',email='',owner=S.users[0]?.id,sel=[],notes='Su
  if(id[0]==='D'){const d=S.deals.find(x=>x.id===id.slice(1));if(d){name=d.account;email=d.email;owner=d.owner;sel=d.services||[]}}
  openModal(`<div class="row"><h3>Summit Creative Group, LLC</h3><div class="s">Quote #SCG-${Math.floor(1000+Math.random()*9000)}<br>${new Date().toLocaleDateString()}</div></div>
  <label style="margin-top:10px">Prepared for</label><input id="pn" value="${esc(name)}"><label>Client email</label><input id="pe" value="${esc(email)}"><label>Prepared by</label><input id="po" value="${esc(uName(owner))}">
- <label>Services (check + edit price)</label>${SRV.map(s=>`<div class="li"><input type="checkbox" class="pc" data-s="${esc(s)}" ${sel.includes(s)?'checked':''}><span>${esc(s)}</span><input type="number" class="pr" value="${rate(s)}"></div>`).join('')}
+ <label>Services (check + edit price)</label>${SRV.map(s=>`<div class="li"><input type="checkbox" class="pc" data-s="${esc(s)}" ${sel.includes(s)?'checked':''}><span>${esc(s)}${isMonthly(s)?'':' <span class="s">(one-time)</span>'}</span><input type="number" class="pr" value="${rate(s)}"></div>`).join('')}
  <div class="row"><div style="flex:1"><label>One-time setup ($)</label><input id="ps" type="number" value="0"></div><div style="flex:1"><label>Discount ($)</label><input id="pd" type="number" value="0"></div></div>
  <label>Scope</label><textarea id="pt" rows="3">${esc(notes)}</textarea><h3 id="ptot" style="text-align:right"></h3>
  <div class="acts np"><button onclick="print()">🖨 Print / PDF</button><button class="bg" id="pmail">📧 Email</button><button class="b2" id="pcopy">📋 Copy</button><button class="bg" id="psave">💾 Save proposal</button><button class="b2" data-a="close">Close</button></div>`);
- const calc=()=>{let m=0;const items=[];document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const p=Number(document.querySelectorAll('.pr')[i].value)||0;m+=p;items.push(`• ${c.dataset.s}: ${$(p)}/mo`)}});
-  const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0,tot=Math.max(0,m+setup-disc);el('ptot').textContent=`Monthly ${$(m)} • Total investment ${$(tot)}`;
+ const calc=()=>{let m=0,ot=0;const items=[];document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const p=Number(document.querySelectorAll('.pr')[i].value)||0;if(isMonthly(c.dataset.s)){m+=p;items.push(`• ${c.dataset.s}: ${$(p)}/mo`)}else{ot+=p;items.push(`• ${c.dataset.s}: ${$(p)} one-time`)}}});
+  const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0,tot=Math.max(0,m+ot+setup-disc);el('ptot').textContent=`Monthly ${$(m)} • Total investment ${$(tot)}`;
   return`SUMMIT CREATIVE GROUP, LLC — PROPOSAL\nPrepared for: ${el('pn').value}\nPrepared by: ${el('po').value}\n\n${items.join('\n')||'• Custom package'}\n${setup?`• One-time setup: ${$(setup)}\n`:''}${disc?`• Discount: -${$(disc)}\n`:''}\nTOTAL INVESTMENT: ${$(tot)}\n\n${el('pt').value}`};
  el('mbox').oninput=calc;calc();
  el('pmail').onclick=()=>{location.href=`mailto:${el('pe').value}?subject=${encodeURIComponent('Summit Creative Group Proposal – '+el('pn').value)}&body=${encodeURIComponent(calc())}`};
- el('psave').onclick=()=>{const items=[];let m=0;document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const pr=Number(document.querySelectorAll('.pr')[i].value)||0;m+=pr;items.push({s:c.dataset.s,p:pr})}});const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0;
- const rec={id:uid(),num:Math.max(2000,...S.props.map(x=>x.num))+1,client:el('pn').value,email:el('pe').value,dealId:id[0]==='D'?id.slice(1):'',items,setup,disc,monthly:m,total:Math.max(0,m+setup-disc),notes:el('pt').value,status:'Draft',date:today(),owner:(S.users.find(u=>u.name===el('po').value)||{}).id};
+ el('psave').onclick=()=>{const items=[];let m=0,ot=0;document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const pr=Number(document.querySelectorAll('.pr')[i].value)||0;const mo=isMonthly(c.dataset.s);if(mo)m+=pr;else ot+=pr;items.push({s:c.dataset.s,p:pr,monthly:mo})}});const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0;
+ const rec={id:uid(),num:Math.max(2000,...S.props.map(x=>x.num))+1,client:el('pn').value,email:el('pe').value,dealId:id[0]==='D'?id.slice(1):'',items,setup,oneTime:ot,disc,monthly:m,total:Math.max(0,m+ot+setup-disc),notes:el('pt').value,status:'Draft',date:today(),owner:(S.users.find(u=>u.name===el('po').value)||{}).id};
  S.props.unshift(rec);if(rec.dealId)logEv('D'+rec.dealId,'Proposal '+rec.num+' saved ('+$(m)+'/mo)');save('props');alert('Saved as proposal '+rec.num)};el('pcopy').onclick=()=>navigator.clipboard.writeText(calc()).then(()=>alert('Copied'),()=>alert('Copy blocked by browser'))}
 
 /* ===== Email templates, recurring invoices, client portal ===== */
