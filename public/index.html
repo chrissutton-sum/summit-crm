@@ -133,8 +133,24 @@ async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').
   const d=await r.json();if(!r.ok){el('loginErr').textContent=d.error||'Could not sign in.';return}
   TOKEN=d.token;MYID=d.userId;IS_ADMIN=d.isAdmin;try{localStorage.setItem('summit_token',TOKEN)}catch(e){}
   await boot()}catch(e){el('loginErr').textContent='Could not reach the server.'}}
-function save(...ks){lastLocal=Date.now();render();pushData()}
-async function pushData(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'}catch(e){if(TOKEN)el('sync').textContent='⚠ save failed'}}
+function save(...ks){lastLocal=Date.now();render();pushData(ks)}
+// Whole-blob save: there's no per-record API, every save PUTs the entire
+// shared dataset. Left alone, that means whoever pushes LAST wins outright —
+// a tab that's been open a while (or just a slow network round trip) can
+// silently overwrite someone else's more recent edit to a totally different
+// record, not just a conflicting edit to the same one. To shrink that
+// window, re-fetch the freshest server copy immediately before writing, and
+// only overlay the section(s) this particular save actually touched (ks) —
+// everything else rides on the just-fetched copy instead of on however
+// stale this tab's local copy happened to be.
+async function pushData(ks){try{
+ try{const r=await api('/api/data');const fresh=await r.json();
+  const touched=new Set(ks&&ks.length?ks:KEYS);let picked=false;
+  KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
+  if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
+ }catch(e){}
+ await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'
+}catch(e){if(TOKEN)el('sync').textContent='⚠ save failed'}}
 async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(Date.now()-lastLocal<4000)return;
  // Don't yank the rug out from under someone mid-type: a background sync used to
  // re-render the whole screen every 10s regardless, which wiped out any text typed
