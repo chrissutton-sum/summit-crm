@@ -1,9 +1,11 @@
 const path = require('path');
+const dns = require('dns').promises;
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { pool, init } = require('./db');
 const { signToken, requireAuth, requireAdmin } = require('./auth');
+const { fetchAndParseICS } = require('./ics');
 
 const app = express();
 app.use(cors());
@@ -93,6 +95,67 @@ app.put('/api/data', requireAuth, async (req, res) => {
   if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Invalid payload' });
   await pool.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
   res.json({ ok: true });
+});
+
+// ---- Calendar sync: each team member can paste their calendar's private
+// iCal (.ics) feed URL (Google Calendar → Settings → "Secret address in
+// iCal format"; Outlook/Apple have similar "Subscribe"/public ics links).
+// We fetch+parse that feed server-side (so the browser never hits CORS, and
+// the URL itself — which usually contains a secret token — never has to be
+// embedded in frontend code) and hand back plain events for the Shared
+// Calendar view. ----
+function isBlockedHost(hostname, ip) {
+  const h = (hostname || '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true;
+  if (!ip) return false;
+  if (ip.includes(':')) {
+    const low = ip.toLowerCase();
+    return low === '::1' || low.startsWith('fc') || low.startsWith('fd') || low.startsWith('fe80');
+  }
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) return true;
+  const [a, b] = parts;
+  return a === 127 || a === 10 || a === 0 || (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+const feedCache = new Map(); // url -> { at, events, error }
+const FEED_TTL_MS = 10 * 60 * 1000;
+
+app.get('/api/calendar-feed', requireAuth, async (req, res) => {
+  const raw = (req.query.url || '').toString().trim();
+  if (!raw) return res.status(400).json({ error: 'url required' });
+  let parsed;
+  try { parsed = new URL(raw); } catch (e) { return res.status(400).json({ error: 'Not a valid URL' }); }
+  if (!/^https?:$/.test(parsed.protocol)) return res.status(400).json({ error: 'Calendar URL must be http(s)' });
+
+  const cached = feedCache.get(raw);
+  if (cached && Date.now() - cached.at < FEED_TTL_MS) {
+    if (cached.error) return res.status(502).json({ error: cached.error });
+    return res.json({ events: cached.events, cached: true });
+  }
+
+  try {
+    let addr;
+    try {
+      const lookup = await dns.lookup(parsed.hostname);
+      addr = lookup.address;
+    } catch (e) {
+      throw new Error('Could not resolve that calendar host');
+    }
+    if (isBlockedHost(parsed.hostname, addr)) throw new Error('That calendar URL points at a blocked address');
+
+    const now = Date.now();
+    const windowStart = now - 7 * 86400000;
+    const windowEnd = now + 60 * 86400000;
+    const events = await fetchAndParseICS(raw, windowStart, windowEnd);
+    feedCache.set(raw, { at: Date.now(), events, error: null });
+    res.json({ events, cached: false });
+  } catch (e) {
+    const msg = e && e.message ? e.message : 'Could not load that calendar';
+    feedCache.set(raw, { at: Date.now(), events: [], error: msg });
+    res.status(502).json({ error: msg });
+  }
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

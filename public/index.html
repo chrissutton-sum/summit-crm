@@ -61,6 +61,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 /* ===== Data & storage: shared via db capability, falls back to localStorage ===== */
 const KEY='summit_crm_v4', uid=()=>Math.random().toString(36).slice(2,10), $=n=>'$'+Math.round(n||0).toLocaleString();
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function timeAgo(ms){const s=Math.max(0,Math.round((Date.now()-ms)/1000));if(s<60)return 'just now';const m=Math.round(s/60);if(m<60)return m+'m ago';const h=Math.round(m/60);if(h<24)return h+'h ago';return Math.round(h/24)+'d ago'}
 const SRV=['SEO','AEO','GEO','CTV','Social Media','Podcasts','Logo Design','Live Events'];
 const DEF=()=>({users:[{id:'u1',name:'Alex',role:'Managing Partner'},{id:'u2',name:'Sarah',role:'Account Executive'},{id:'u3',name:'Jordan',role:'Events & Media'}],
  cfg:{rates:{SEO:1200,AEO:850,GEO:850,CTV:2200,'Social Media':950,Podcasts:900,'Logo Design':750,'Live Events':2500},
@@ -109,7 +110,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set();
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -146,12 +147,32 @@ async function pullData(quiet){try{const r=await api('/api/data');const d=await 
  merge(d);el('sync').textContent='● shared';
  if(tag==='INPUT'||tag==='TEXTAREA')return;
  if(!quiet)render()}catch(e){}}
+// Pulls every team member's connected calendar feed (iCal/.ics URL, set in
+// Settings → Your calendar) through the server-side proxy and caches the
+// parsed events per-user in calFeeds. Safe to call often — the server itself
+// caches each feed for ~10min, this just re-renders from whatever's fresh.
+async function syncCalendars(force){
+ const withFeed=S.users.filter(u=>u.icsUrl);
+ if(!withFeed.length)return;
+ if(calSyncing)return;
+ if(!force&&Date.now()-calSyncAt<120000)return;
+ calSyncing=true;if(tab==='cal')render();
+ await Promise.all(withFeed.map(async u=>{
+  try{const r=await api('/api/calendar-feed?url='+encodeURIComponent(u.icsUrl));const d=await r.json();
+   if(!r.ok)throw new Error(d.error||'Could not load this calendar');
+   calFeeds[u.id]={events:d.events||[],error:null,at:Date.now()}}
+  catch(e){calFeeds[u.id]={events:(calFeeds[u.id]&&calFeeds[u.id].events)||[],error:e.message||'Could not load this calendar',at:Date.now()}}
+ }));
+ calSyncAt=Date.now();calSyncing=false;
+ if(tab==='cal')render();
+}
 async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
  init();
  setInterval(()=>pullData(false),10000);
+ setInterval(()=>{if(tab==='cal')syncCalendars(false)},300000);
 }
 (async()=>{
  try{TOKEN=localStorage.getItem('summit_token')}catch(e){}
@@ -256,7 +277,20 @@ function vDeals(){
  return head+`<p class="s" style="margin-bottom:8px">Drag cards between columns, or use ◀ ▶. Moving a deal to <b>${esc(WON())}</b> auto-creates the client account + onboarding checklist.</p><div class="kan">`+S.cfg.stages.map(st=>{const l=D.filter(d=>d.stage===st);return`<div class="col" data-stage="${esc(st)}"><h3><span>${esc(st)} (${l.length})</span><span style="color:var(--gold)">${$(l.reduce((t,d)=>t+d.amount,0))}</span></h3>${l.map(card).join('')||'<div class="s" style="text-align:center;padding:24px;border:1px dashed var(--bd);border-radius:8px">Drop here</div>'}</div>`}).join('')+'</div>'}
 function vCal(){
  const A=S.acts.filter(mine).sort((a,b)=>new Date(a.dt)-new Date(b.dt));
- return`<div class="row" style="margin-bottom:10px"><h2>Shared Calendar</h2><button data-a="newAct">+ Schedule</button></div>`+(A.map(a=>{const late=dueNow(a);return`<div class="card" style="${a.done?'opacity:.5':''}"><div class="row"><div><div class="t" style="${a.done?'text-decoration:line-through':''}">${esc(a.title)}</div><div class="s">🏢 ${esc(a.client)} • 👤 ${esc(uName(a.owner))}</div></div><span class="badge ${late&&!a.done?'r':''}">${esc(a.type)}${late&&!a.done?' • OVERDUE':''}</span></div><div class="s" style="color:var(--cyan);margin:6px 0">🕒 ${esc(a.dt.replace('T',' at '))} ${a.pri==='High'?'🔥':''}</div><button class="b2" data-a="actDone" data-id="${a.id}">${a.done?'↩ Reopen':'✅ Complete'}</button> <button class="bd" data-a="delAct" data-id="${a.id}">🗑️</button></div>`}).join('')||'<div class="card s">Nothing scheduled.</div>')}
+ const withFeed=S.users.filter(u=>u.icsUrl);
+ const ext=[];
+ withFeed.forEach(u=>{const f=calFeeds[u.id];if(f&&f.events)f.events.forEach(e=>ext.push({...e,owner:u.id}))});
+ const extMine=ext.filter(mine);
+ const items=A.map(a=>({sort:a.dt,crm:a})).concat(extMine.map(e=>({sort:e.allDay?e.start+'T00:00':e.start,ext:e}))).sort((x,y)=>x.sort<y.sort?-1:x.sort>y.sort?1:0);
+ const errs=withFeed.filter(u=>mine({owner:u.id})&&calFeeds[u.id]&&calFeeds[u.id].error);
+ const syncLabel=calSyncing?'Syncing…':calSyncAt?'Synced '+timeAgo(calSyncAt):withFeed.length?'Not synced yet':'';
+ return`<div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px"><h2>Shared Calendar</h2><div style="display:flex;align-items:center;gap:8px">${withFeed.length?`<span class="s">${esc(syncLabel)}</span><button class="b2" data-a="syncCal" ${calSyncing?'disabled':''}>🔄 Sync calendars</button>`:''}<button data-a="newAct">+ Schedule</button></div></div>`
+ +(withFeed.length?'':`<div class="card s" style="margin-bottom:10px">No one's connected a personal calendar yet. Add yours in Settings → Your calendar to see it here alongside the team's.</div>`)
+ +errs.map(u=>`<div class="card s" style="margin-bottom:10px;color:var(--bad)">⚠ Couldn't load ${esc(u.name)}'s calendar — ${esc(calFeeds[u.id].error)}</div>`).join('')
+ +(items.map(it=>{
+   if(it.crm){const a=it.crm,late=dueNow(a);return`<div class="card" style="${a.done?'opacity:.5':''}"><div class="row"><div><div class="t" style="${a.done?'text-decoration:line-through':''}">${esc(a.title)}</div><div class="s">🏢 ${esc(a.client)} • 👤 ${esc(uName(a.owner))}</div></div><span class="badge ${late&&!a.done?'r':''}">${esc(a.type)}${late&&!a.done?' • OVERDUE':''}</span></div><div class="s" style="color:var(--cyan);margin:6px 0">🕒 ${esc(a.dt.replace('T',' at '))} ${a.pri==='High'?'🔥':''}</div><button class="b2" data-a="actDone" data-id="${a.id}">${a.done?'↩ Reopen':'✅ Complete'}</button> <button class="bd" data-a="delAct" data-id="${a.id}">🗑️</button></div>`}
+   const e=it.ext;return`<div class="card"><div class="row"><div><div class="t">${esc(e.title)}</div><div class="s">${e.location?'📍 '+esc(e.location)+' • ':''}👤 ${esc(uName(e.owner))}</div></div><span class="badge">📆 ${e.allDay?'All day':'Synced'}</span></div><div class="s" style="color:var(--cyan);margin:6px 0">🕒 ${e.allDay?esc(e.start):esc(e.start.replace('T',' at '))}</div></div>`
+ }).join('')||(withFeed.length?'<div class="card s">Nothing scheduled.</div>':''))}
 function vClients(){
  const{items:Ap,page,pages}=paginate(S.accts.filter(mine),clientPage);clientPage=page;
  return`<div class="row" style="margin-bottom:10px"><h2>Clients & Onboarding</h2><div>${Ap.length?`<button class="b2" data-a="expandAllAccts">Expand all</button> <button class="b2" data-a="collapseAllAccts">Collapse all</button> `:''}<button data-a="newAcct">+ Client</button></div></div>`+(Ap.map(a=>{const n=a.steps.length,d=a.steps.filter(s=>s.done).length,p=n?Math.round(d/n*100):0,open=openAccts.has(a.id);
@@ -274,6 +308,7 @@ function vSet(){
  return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
  <label style="margin-top:14px">Your Zoom link</label><input id="zoomLink" placeholder="https://zoom.us/j/1234567890" value="${esc(ME()?.zoom||'')}"><p class="s" style="margin-top:4px">Paste your Zoom Personal Meeting Room link (find it at zoom.us → Profile, or in the Zoom app under Home → your name). This powers the 🎥 Call button on your leads and clients.</p><button class="b2" data-a="saveZoom">Save Zoom link</button></div>
+ <div class="card"><div class="t">Your calendar</div><label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://calendar.google.com/calendar/ical/.../private-xxxx/basic.ics" value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Google Calendar: Settings → (pick your calendar) → "Secret address in iCal format". Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Paste that link here — it's kept private to Summit CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</div>
  <div class="card"><div class="t">Service Rate Card ($/mo)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}"></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
@@ -282,7 +317,7 @@ const owners=()=>S.users.map(u=>[u.id,u.name]);
 const camps=()=>[['','— No campaign —']].concat(S.campaigns.map(c=>[c.id,c.name]));
 const CSTAT=['Planned','Active','Paused','Completed'];
 const A={
- tab(id){tab=id;render();scrollTo(0,0)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
+ tab(id){tab=id;render();scrollTo(0,0);if(id==='cal')syncCalendars(false)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
  alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${esc(uName(a.owner))} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
  newLead(){A.editLead()},
  openLeadFolder(id){leadFolder=id;leadPage=0;render();scrollTo(0,0)},
@@ -346,6 +381,9 @@ const A={
    alert('Password changed.');render()}catch(e){el('pwErr').textContent='Could not reach the server.'}},
  async delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users');try{await api('/api/accounts/'+id,{method:'DELETE'})}catch(e){}},
  saveZoom(){const v=el('zoomLink').value.trim();const u=ME();if(!u)return;if(v&&!/^https?:\/\//i.test(v))return alert('That doesn\'t look like a link — it should start with https://');u.zoom=v;save('users');alert(v?'Zoom link saved.':'Zoom link cleared.')},
+ saveIcs(){const v=el('icsUrl').value.trim();const u=ME();if(!u)return;if(v&&!/^https?:\/\//i.test(v))return alert('That doesn\'t look like a link — it should start with https://');u.icsUrl=v;delete calFeeds[u.id];save('users');if(v)syncCalendars(true);alert(v?'Calendar link saved. It will show up on the Shared Calendar.':'Calendar link cleared.')},
+ clearIcs(){const u=ME();if(!u)return;delete u.icsUrl;delete calFeeds[u.id];save('users');render()},
+ syncCal(){syncCalendars(true)},
  callLead(id){const l=S.leads.find(x=>x.id===id);if(l)zoomCall(l.owner)},
  callAcct(id){const a=S.accts.find(x=>x.id===id);if(a)zoomCall(a.owner)},
  saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);save('cfg');alert('Rates saved')},
