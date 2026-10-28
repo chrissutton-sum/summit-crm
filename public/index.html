@@ -110,7 +110,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}};
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -147,18 +147,24 @@ async function pullData(quiet){try{const r=await api('/api/data');const d=await 
  merge(d);el('sync').textContent='● shared';
  if(tag==='INPUT'||tag==='TEXTAREA')return;
  if(!quiet)render()}catch(e){}}
-// Pulls every team member's connected calendar feed (iCal/.ics URL, set in
+async function refreshGoogleStatus(){
+ try{const r=await api('/api/google/status-all');const d=await r.json();googleStatus={configured:!!d.configured,connected:d.connected||{}}}catch(e){}
+}
+function hasFeed(u){return !!u.icsUrl||!!googleStatus.connected[u.id]}
+// Pulls every team member's connected calendar (either a pasted iCal/.ics
+// URL, or a Google Calendar connected via Sign in with Google — both set in
 // Settings → Your calendar) through the server-side proxy and caches the
 // parsed events per-user in calFeeds. Safe to call often — the server itself
 // caches each feed for ~10min, this just re-renders from whatever's fresh.
 async function syncCalendars(force){
- const withFeed=S.users.filter(u=>u.icsUrl);
+ const withFeed=S.users.filter(hasFeed);
  if(!withFeed.length)return;
  if(calSyncing)return;
  if(!force&&Date.now()-calSyncAt<120000)return;
  calSyncing=true;if(tab==='cal')render();
  await Promise.all(withFeed.map(async u=>{
-  try{const r=await api('/api/calendar-feed?url='+encodeURIComponent(u.icsUrl));const d=await r.json();
+  const url=u.icsUrl?('/api/calendar-feed?url='+encodeURIComponent(u.icsUrl)):('/api/calendar-feed/google?ownerId='+encodeURIComponent(u.id));
+  try{const r=await api(url);const d=await r.json();
    if(!r.ok)throw new Error(d.error||'Could not load this calendar');
    calFeeds[u.id]={events:d.events||[],error:null,at:Date.now()}}
   catch(e){calFeeds[u.id]={events:(calFeeds[u.id]&&calFeeds[u.id].events)||[],error:e.message||'Could not load this calendar',at:Date.now()}}
@@ -170,9 +176,21 @@ async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
+ await refreshGoogleStatus();
  init();
+ handleGoogleRedirect();
  setInterval(()=>pullData(false),10000);
  setInterval(()=>{if(tab==='cal')syncCalendars(false)},300000);
+}
+// After the Google OAuth consent screen, the browser lands back on '/' with
+// ?gcal=ok or ?gcal=error&msg=... (full page navigation, so this only runs
+// once on the next boot, not as part of the SPA's normal click flow).
+function handleGoogleRedirect(){
+ const p=new URLSearchParams(location.search),g=p.get('gcal');
+ if(!g)return;
+ history.replaceState(null,'',location.pathname);
+ if(g==='ok'){tab='set';render();alert('Google Calendar connected.');syncCalendars(true)}
+ else alert('Could not connect Google Calendar: '+(p.get('msg')||'unknown error'))
 }
 (async()=>{
  try{TOKEN=localStorage.getItem('summit_token')}catch(e){}
@@ -282,7 +300,7 @@ function vDeals(){
  return head+`<p class="s" style="margin-bottom:8px">Drag cards between columns, or use ◀ ▶. Moving a deal to <b>${esc(WON())}</b> auto-creates the client account + onboarding checklist.</p><div class="kan">`+S.cfg.stages.map(st=>{const l=D.filter(d=>d.stage===st);return`<div class="col" data-stage="${esc(st)}"><h3><span>${esc(st)} (${l.length})</span><span style="color:var(--gold)">${$(l.reduce((t,d)=>t+d.amount,0))}</span></h3>${l.map(card).join('')||'<div class="s" style="text-align:center;padding:24px;border:1px dashed var(--bd);border-radius:8px">Drop here</div>'}</div>`}).join('')+'</div>'}
 function vCal(){
  const A=S.acts.filter(mine).sort((a,b)=>new Date(a.dt)-new Date(b.dt));
- const withFeed=S.users.filter(u=>u.icsUrl);
+ const withFeed=S.users.filter(hasFeed);
  const ext=[];
  withFeed.forEach(u=>{const f=calFeeds[u.id];if(f&&f.events)f.events.forEach(e=>ext.push({...e,owner:u.id}))});
  const extMine=ext.filter(mine);
@@ -313,7 +331,9 @@ function vSet(){
  return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
  <label style="margin-top:14px">Your Zoom link</label><input id="zoomLink" placeholder="https://zoom.us/j/1234567890" value="${esc(ME()?.zoom||'')}"><p class="s" style="margin-top:4px">Paste your Zoom Personal Meeting Room link (find it at zoom.us → Profile, or in the Zoom app under Home → your name). This powers the 🎥 Call button on your leads and clients.</p><button class="b2" data-a="saveZoom">Save Zoom link</button></div>
- <div class="card"><div class="t">Your calendar</div><label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://calendar.google.com/calendar/ical/.../private-xxxx/basic.ics" value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Google Calendar: Settings → (pick your calendar) → "Secret address in iCal format". Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</div>
+ <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
+ <details style="margin-top:12px"><summary class="s" style="cursor:pointer">Or paste a calendar link (Outlook, Apple Calendar, etc.)</summary>
+ <label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://..." value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Google Calendar also works this way if you'd rather not use the sign-in button: Settings → (pick your calendar) → "Secret address in iCal format". Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</details></div>
  <div class="card"><div class="t">Service Rate Card ($/mo)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}"></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
@@ -391,6 +411,8 @@ const A={
  saveIcs(){const v=el('icsUrl').value.trim();const u=ME();if(!u)return;if(v&&!/^https?:\/\//i.test(v))return alert('That doesn\'t look like a link — it should start with https://');u.icsUrl=v;delete calFeeds[u.id];save('users');if(v)syncCalendars(true);alert(v?'Calendar link saved. It will show up on the Shared Calendar.':'Calendar link cleared.')},
  clearIcs(){const u=ME();if(!u)return;delete u.icsUrl;delete calFeeds[u.id];save('users');render()},
  syncCal(){syncCalendars(true)},
+ async signInGoogle(){try{const r=await api('/api/google/auth-url');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start Google sign-in');location.href=d.url}catch(e){alert(e.message)}},
+ async disconnectGoogle(){if(!confirm('Disconnect your Google Calendar?'))return;try{await api('/api/google/disconnect',{method:'POST'});delete calFeeds[MYID];await refreshGoogleStatus();render()}catch(e){alert('Could not disconnect.')}},
  callLead(id){const l=S.leads.find(x=>x.id===id);if(l)zoomCall(l.owner)},
  callAcct(id){const a=S.accts.find(x=>x.id===id);if(a)zoomCall(a.owner)},
  saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);save('cfg');alert('Rates saved')},

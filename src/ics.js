@@ -280,4 +280,9 @@ async function fetchAndParseICS(url, windowStartMs, windowEndMs, fetchImpl) {
   return parseICS(text, windowStartMs, windowEndMs);
 }
 
-module.exports = { parseICS, fetchAndParseICS, BIZ_TZ };
+// Exposed for other calendar sources (e.g. the Google Calendar API, which
+// already hands back ISO datetimes with an explicit UTC offset) that just
+// need "what wall-clock time is this UTC instant in the business's zone".
+function utcMsToBizLocal(ms) { return formatInTZ(ms, BIZ_TZ); }
+
+module.exports = { parseICS, fetchAndParseICS, BIZ_TZ, utcMsToBizLocal };

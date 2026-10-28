@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const { pool, init } = require('./db');
 const { signToken, requireAuth, requireAdmin } = require('./auth');
 const { fetchAndParseICS } = require('./ics');
+const google = require('./google');
 
 const app = express();
 app.use(cors());
@@ -158,6 +159,59 @@ app.get('/api/calendar-feed', requireAuth, async (req, res) => {
   }
 });
 
+// ---- Google Calendar sign-in (OAuth) ----
+// Requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI env
+// vars, set up once in Google Cloud Console. Until configured, these routes
+// report that plainly rather than erroring, so the frontend can show a clear
+// "not set up yet" state instead of a broken button.
+app.get('/api/google/auth-url', requireAuth, (req, res) => {
+  if (!google.configured()) return res.status(501).json({ error: 'Google sign-in is not set up yet' });
+  res.json({ url: google.buildAuthUrl(req.account.userId) });
+});
+
+app.get('/api/google/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  if (error) return res.redirect('/?gcal=error&msg=' + encodeURIComponent(String(error)));
+  try {
+    if (!google.configured()) throw new Error('Google sign-in is not set up yet');
+    const userId = google.verifyState(String(state || ''));
+    await google.connect(userId, String(code || ''));
+    res.redirect('/?gcal=ok');
+  } catch (e) {
+    res.redirect('/?gcal=error&msg=' + encodeURIComponent((e && e.message) || 'Could not connect Google Calendar'));
+  }
+});
+
+app.post('/api/google/disconnect', requireAuth, async (req, res) => {
+  await google.disconnect(req.account.userId);
+  res.json({ ok: true });
+});
+
+app.get('/api/google/status-all', requireAuth, async (req, res) => {
+  res.json({ configured: google.configured(), connected: await google.statusAll() });
+});
+
+const gcalCache = new Map(); // userId -> { at, events, error }
+app.get('/api/calendar-feed/google', requireAuth, async (req, res) => {
+  const ownerId = String(req.query.ownerId || '');
+  if (!ownerId) return res.status(400).json({ error: 'ownerId required' });
+  const cached = gcalCache.get(ownerId);
+  if (cached && Date.now() - cached.at < FEED_TTL_MS) {
+    if (cached.error) return res.status(502).json({ error: cached.error });
+    return res.json({ events: cached.events, cached: true });
+  }
+  try {
+    const now = Date.now();
+    const events = await google.fetchEvents(ownerId, now - 7 * 86400000, now + 60 * 86400000);
+    gcalCache.set(ownerId, { at: Date.now(), events, error: null });
+    res.json({ events, cached: false });
+  } catch (e) {
+    const msg = (e && e.message) || 'Could not load this calendar';
+    gcalCache.set(ownerId, { at: Date.now(), events: [], error: msg });
+    res.status(502).json({ error: msg });
+  }
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // ---- Static frontend ----
@@ -167,6 +221,7 @@ app.get('*', (req, res) => {
 });
 
 init()
+  .then(() => google.initTable())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
   })
