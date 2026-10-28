@@ -138,9 +138,14 @@ async function pullData(quiet){try{const r=await api('/api/data');const d=await 
  // Don't yank the rug out from under someone mid-type: a background sync used to
  // re-render the whole screen every 10s regardless, which wiped out any text typed
  // into a field (e.g. Settings → "+ Add user") that hadn't been saved yet. If the
- // person is focused in a text field, hold this sync until they're done.
- const a=document.activeElement,tag=a&&a.tagName;if(tag==='INPUT'||tag==='TEXTAREA')return;
- merge(d);el('sync').textContent='● shared';if(!quiet)render()}catch(e){}}
+ // person is focused in a text field, hold off on the RE-RENDER until they're done —
+ // but still merge the incoming data so it isn't silently dropped. (A previous version
+ // skipped the merge too, so leaving a search/filter box focused meant this tab never
+ // picked up changes made elsewhere, even hours later — looked like "sync is broken".)
+ const a=document.activeElement,tag=a&&a.tagName;
+ merge(d);el('sync').textContent='● shared';
+ if(tag==='INPUT'||tag==='TEXTAREA')return;
+ if(!quiet)render()}catch(e){}}
 async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
