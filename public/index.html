@@ -145,7 +145,7 @@ function save(...ks){lastLocal=Date.now();render();pushData(ks)}
 // stale this tab's local copy happened to be.
 async function pushData(ks){try{
  try{const r=await api('/api/data');const fresh=await r.json();
-  const touched=new Set(ks&&ks.length?ks:KEYS);let picked=false;
+  const touched=new Set(ks&&ks.length?ks:KEYS);touched.add('audit');let picked=false;
   KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
   if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
  }catch(e){}
@@ -240,7 +240,7 @@ function form(title,fields,v,onSave){
   else h+=`<input id="f_${f.k}" type="${f.t||'text'}" value="${esc(val)}" placeholder="${esc(f.p||'')}">`});
  h+=`<div class="row"><button id="fsave" style="flex:1">Save</button><button class="b2" data-a="close">Cancel</button></div>`;
  openModal(h);
- el('fsave').onclick=()=>{const o={};fields.forEach(f=>{const e=el('f_'+f.k);o[f.k]=f.t==='srv'?[...e.querySelectorAll('input:checked')].map(i=>i.value):f.t==='number'?Number(e.value)||0:e.value.trim()});{const lbl=title+': '+(o.company||o.name||o.title||o.client||'');if(onSave(o)!==false){aud(lbl);save('audit');closeM()}}}}
+ el('fsave').onclick=()=>{const o={};fields.forEach(f=>{const e=el('f_'+f.k);o[f.k]=f.t==='srv'?[...e.querySelectorAll('input:checked')].map(i=>i.value):f.t==='number'?Number(e.value)||0:e.value.trim()});{const lbl=title+': '+(o.company||o.name||o.title||o.client||'');if(onSave(o)!==false){aud(lbl);closeM()}}}}
 const $$=n=>Math.round(n).toLocaleString();
 /* ===== Views ===== */
 const TABS=[['dash','📊','Analytics'],['camp','📣','Campaigns'],['leads','🎯','Leads'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
