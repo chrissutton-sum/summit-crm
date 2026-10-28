@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Summit Creative Group | CRM</title>
+<title>SCG CRM</title>
 <style>
 :root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#070b12;--panel:#101726;--card:#162033;--inp:#0b101b;--blue:#2563eb;--cyan:#38bdf8;--gold:#f59e0b;--tx:#f1f5f9;--mut:#94a3b8;--bd:#283754;--ok:#10b981;--bad:#ef4444}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -41,7 +41,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 </style></head><body>
 <div id="loginScreen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px">
  <div style="width:100%;max-width:340px">
-  <h1 style="text-align:center;margin-bottom:4px">Summit Creative<small style="display:block;text-align:center;font-size:.62rem;color:var(--cyan);margin-top:4px">Command CRM • Boise, ID</small></h1>
+  <h1 style="text-align:center;margin-bottom:4px">SCG CRM<small style="display:block;text-align:center;font-size:.62rem;color:var(--cyan);margin-top:4px">Summit Creative Group • Boise, ID</small></h1>
   <div class="card" style="margin-top:20px">
    <label>Username</label><input id="loginUser" autocomplete="username" autocapitalize="off">
    <label>Password</label><input id="loginPass" type="password" autocomplete="current-password">
@@ -51,7 +51,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
  </div>
 </div>
 <div id="app" style="display:none">
-<header><h1>Summit Creative<small>Command CRM • Boise, ID</small></h1>
+<header><h1>SCG CRM<small>Summit Creative Group • Boise, ID</small></h1>
 <div style="display:flex;gap:6px;align-items:center"><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" data-a="search">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
 <div class="wrap" id="main"></div>
 <nav id="nav"></nav>
@@ -313,7 +313,7 @@ function vSet(){
  return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
  <label style="margin-top:14px">Your Zoom link</label><input id="zoomLink" placeholder="https://zoom.us/j/1234567890" value="${esc(ME()?.zoom||'')}"><p class="s" style="margin-top:4px">Paste your Zoom Personal Meeting Room link (find it at zoom.us → Profile, or in the Zoom app under Home → your name). This powers the 🎥 Call button on your leads and clients.</p><button class="b2" data-a="saveZoom">Save Zoom link</button></div>
- <div class="card"><div class="t">Your calendar</div><label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://calendar.google.com/calendar/ical/.../private-xxxx/basic.ics" value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Google Calendar: Settings → (pick your calendar) → "Secret address in iCal format". Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Paste that link here — it's kept private to Summit CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</div>
+ <div class="card"><div class="t">Your calendar</div><label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://calendar.google.com/calendar/ical/.../private-xxxx/basic.ics" value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Google Calendar: Settings → (pick your calendar) → "Secret address in iCal format". Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</div>
  <div class="card"><div class="t">Service Rate Card ($/mo)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}"></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
@@ -612,7 +612,7 @@ Object.assign(A,{
  expOpen(){openModal(`<h3>⬇ Export for another CRM</h3><label>Target CRM</label><select id="exf">${Object.keys(EXP).map(k=>`<option>${k}</option>`).join('')}</select><label>Data</label><select id="exd"><option value="leads">Leads / Contacts</option><option value="deals">Deals / Opportunities</option><option value="clients">Clients / Accounts</option></select><p class="s" style="margin:6px 0">Columns follow each system's usual import headers. In their import wizard, map any column that doesn't match automatically, and create matching pipeline stages first (your stage names are exported as-is).</p><div class="acts"><button id="exg">Download CSV</button><button class="b2" data-a="close">Cancel</button></div>`);
   el('exg').onclick=()=>{const f=el('exf').value,d=el('exd').value;doDownload(`summit_${f.toLowerCase()}_${d}.csv`,csvStr(EXP[f][d]()));aud('Exported '+d+' for '+f)}},
  restoreOpen(){openModal(`<h3>♻ Restore JSON backup</h3><p class="s">Choose a backup made with “JSON backup”. This <b>replaces all current data</b> for everyone.</p><input type="file" id="rjf" accept=".json,application/json"><div class="acts"><button class="b2" data-a="close">Cancel</button></div>`);
-  el('rjf').onchange=e=>{const f=e.target.files[0];if(!f)return;fileText(f,t=>{let d;try{d=JSON.parse(t)}catch(x){return alert('That file is not valid JSON.')}if(!d||!Array.isArray(d.users)||!Array.isArray(d.leads))return alert('This does not look like a Summit CRM backup.');if(!confirm('Replace ALL current data with this backup?'))return;merge(d);aud('Restored JSON backup');save();closeM()})}}
+  el('rjf').onchange=e=>{const f=e.target.files[0];if(!f)return;fileText(f,t=>{let d;try{d=JSON.parse(t)}catch(x){return alert('That file is not valid JSON.')}if(!d||!Array.isArray(d.users)||!Array.isArray(d.leads))return alert('This does not look like an SCG CRM backup.');if(!confirm('Replace ALL current data with this backup?'))return;merge(d);aud('Restored JSON backup');save();closeM()})}}
 });
 
 /* ===== v8: website lead capture (merged with live 1792182599-07aa) ===== */
