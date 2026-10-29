@@ -13,7 +13,14 @@ const { pool } = require('./db');
 // account-d.docusign.com / demo.docusign.net — swap these two hosts, and
 // nothing else, to point this whole module at the sandbox instead.)
 const AUTH_HOST = 'https://account.docusign.com';
-const SCOPES = ['signature', 'extended'];
+// Just 'signature' — the 'extended' scope (for a sliding, non-expiring
+// refresh token) requires DocuSign to specifically enable it for this
+// Integration Key first; requesting it before that happens makes the
+// consent screen fail silently (blank page, no error shown). Without it,
+// the refresh token is good for 30 days from connecting and does NOT
+// renew itself on use, so Settings will need a one-time reconnect roughly
+// every 30 days unless DocuSign enables 'extended' for this key later.
+const SCOPES = ['signature'];
 
 function configured() {
   return !!(process.env.DOCUSIGN_INTEGRATION_KEY && process.env.DOCUSIGN_CLIENT_SECRET && process.env.DOCUSIGN_REDIRECT_URI);
