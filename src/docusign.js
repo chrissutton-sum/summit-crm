@@ -9,10 +9,14 @@
 const jwt = require('jsonwebtoken');
 const { pool } = require('./db');
 
-// Production DocuSign. (DocuSign's sandbox/demo environment uses
-// account-d.docusign.com / demo.docusign.net — swap these two hosts, and
-// nothing else, to point this whole module at the sandbox instead.)
-const AUTH_HOST = 'https://account.docusign.com';
+// DocuSign's sandbox/developer environment — this Integration Key was
+// created there (DocuSign auto-enrolls new "Apps and Keys" into a sandbox
+// unless you're specifically in a production admin console), and it's also
+// what we want for testing before going live anyway. Swap this one host for
+// 'https://account.docusign.com' (and nothing else — base_uri for API calls
+// is discovered dynamically from the userinfo response either way) once
+// ready to switch to the production account and a production Integration Key.
+const AUTH_HOST = 'https://account-d.docusign.com';
 // Just 'signature' — the 'extended' scope (for a sliding, non-expiring
 // refresh token) requires DocuSign to specifically enable it for this
 // Integration Key first; requesting it before that happens makes the
