@@ -10,6 +10,17 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// node-postgres gotcha that crashed this server twice: when an IDLE client
+// in the pool loses its connection (Neon's free tier drops idle connections
+// after inactivity; a network blip can too), the Pool emits an 'error'
+// event. With no listener for it, Node's default behavior is to throw and
+// kill the whole process — even though the error has nothing to do with any
+// request in flight. The pool recovers on its own (it opens a fresh
+// connection on the next query); we just need to not let this crash the app.
+pool.on('error', (err) => {
+  console.error('Postgres pool: idle client error (recovered automatically):', err.message);
+});
+
 // Default data shape, mirrors what the CRM page used to seed into its shared doc.
 function defaultData() {
   return {
