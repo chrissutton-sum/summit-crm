@@ -7,6 +7,7 @@ const { pool, init } = require('./db');
 const { signToken, requireAuth, requireAdmin } = require('./auth');
 const { fetchAndParseICS } = require('./ics');
 const google = require('./google');
+const docusign = require('./docusign');
 
 const app = express();
 app.use(cors());
@@ -212,6 +213,55 @@ app.get('/api/calendar-feed/google', requireAuth, async (req, res) => {
   }
 });
 
+// ---- DocuSign e-signature (one shared company account, connected once by an
+// admin from Settings; any team member can then send a proposal for
+// signature from the CRM). ----
+app.get('/api/docusign/auth-url', requireAuth, requireAdmin, (req, res) => {
+  if (!docusign.configured()) return res.status(501).json({ error: 'DocuSign is not set up yet' });
+  res.json({ url: docusign.buildAuthUrl() });
+});
+
+app.get('/api/docusign/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  if (error) return res.redirect('/?ds=error&msg=' + encodeURIComponent(String(error)));
+  try {
+    if (!docusign.configured()) throw new Error('DocuSign is not set up yet');
+    docusign.verifyState(String(state || ''));
+    await docusign.connect(String(code || ''));
+    res.redirect('/?ds=ok');
+  } catch (e) {
+    res.redirect('/?ds=error&msg=' + encodeURIComponent((e && e.message) || 'Could not connect DocuSign'));
+  }
+});
+
+app.post('/api/docusign/disconnect', requireAuth, requireAdmin, async (req, res) => {
+  await docusign.disconnect();
+  res.json({ ok: true });
+});
+
+app.get('/api/docusign/status', requireAuth, async (req, res) => {
+  res.json({ configured: docusign.configured(), ...(await docusign.status()) });
+});
+
+app.post('/api/docusign/send', requireAuth, async (req, res) => {
+  const { proposal, recipientEmail, recipientName } = req.body || {};
+  if (!proposal) return res.status(400).json({ error: 'proposal required' });
+  try {
+    const result = await docusign.sendForSignature(proposal, recipientEmail, recipientName);
+    res.json(result);
+  } catch (e) {
+    res.status(502).json({ error: (e && e.message) || 'Could not send for signature' });
+  }
+});
+
+app.get('/api/docusign/envelope/:id', requireAuth, async (req, res) => {
+  try {
+    res.json(await docusign.getEnvelopeStatus(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: (e && e.message) || 'Could not check envelope status' });
+  }
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // ---- Static frontend ----
@@ -222,6 +272,7 @@ app.get('*', (req, res) => {
 
 init()
   .then(() => google.initTable())
+  .then(() => docusign.initTable())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
   })

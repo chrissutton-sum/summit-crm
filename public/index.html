@@ -113,7 +113,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}};
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false};
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -191,13 +191,18 @@ async function syncCalendars(force){
  calSyncAt=Date.now();calSyncing=false;
  if(tab==='cal')render();
 }
+async function refreshDocusignStatus(){
+ try{const r=await api('/api/docusign/status');const d=await r.json();docusignStatus={configured:!!d.configured,connected:!!d.connected,email:d.email||''}}catch(e){}
+}
 async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
  await refreshGoogleStatus();
+ await refreshDocusignStatus();
  init();
  handleGoogleRedirect();
+ handleDocusignRedirect();
  setInterval(()=>pullData(false),10000);
  setInterval(()=>{if(tab==='cal')syncCalendars(false)},300000);
 }
@@ -210,6 +215,15 @@ function handleGoogleRedirect(){
  history.replaceState(null,'',location.pathname);
  if(g==='ok'){tab='set';render();alert('Google Calendar connected.');syncCalendars(true)}
  else alert('Could not connect Google Calendar: '+(p.get('msg')||'unknown error'))
+}
+// Same pattern for DocuSign's OAuth consent screen: lands back on '/' with
+// ?ds=ok or ?ds=error&msg=...
+function handleDocusignRedirect(){
+ const p=new URLSearchParams(location.search),g=p.get('ds');
+ if(!g)return;
+ history.replaceState(null,'',location.pathname);
+ if(g==='ok'){tab='set';render();refreshDocusignStatus().then(render);alert('DocuSign connected.')}
+ else alert('Could not connect DocuSign: '+(p.get('msg')||'unknown error'))
 }
 (async()=>{
  try{TOKEN=localStorage.getItem('summit_token')}catch(e){}
@@ -358,6 +372,7 @@ function vSet(){
  <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
  <details style="margin-top:12px"><summary class="s" style="cursor:pointer">Or paste a calendar link (Outlook, Apple Calendar, etc.)</summary>
  <label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://..." value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Google Calendar also works this way if you'd rather not use the sign-in button: Settings → (pick your calendar) → "Secret address in iCal format". Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</details></div>
+ <div class="card"><div class="t">E-signature (DocuSign)</div>${docusignStatus.connected?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected as ${esc(docusignStatus.email)} — every "Send for Signature" goes out through this account.</p>${IS_ADMIN?`<button class="bd" data-a="disconnectDocusign">Disconnect DocuSign</button>`:`<p class="s">Ask Chris to disconnect or reconnect this.</p>`}`:docusignStatus.configured?(IS_ADMIN?`<p class="s" style="margin-top:8px">Connect one company DocuSign account. Once connected, anyone on the team can send a proposal for signature straight from the Quote screen.</p><button data-a="signInDocusign">✍️ Connect DocuSign</button>`:`<p class="s" style="margin-top:8px">Not connected yet — ask Chris to connect the company DocuSign account here.</p>`):`<p class="s" style="margin-top:8px">DocuSign isn't set up for this CRM yet — ask Chris to add the DocuSign API credentials.</p>`}</div>
  <div class="card"><div class="t">Service Rate Card</div><div class="s" style="margin-bottom:4px">Set each service's price and whether it bills monthly (recurring) or one-time.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SRV.map(s=>`<div><label>${esc(s)}</label><div class="row" style="align-items:center;gap:6px"><input type="number" class="rt" data-s="${esc(s)}" value="${rate(s)}" style="flex:1"><label style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:.84rem"><input type="checkbox" class="rtm" data-s="${esc(s)}" ${isMonthly(s)?'checked':''}>Monthly</label></div></div>`).join('')}</div><button data-a="saveRates">Save rates</button></div>
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
@@ -437,6 +452,8 @@ const A={
  syncCal(){syncCalendars(true)},
  async signInGoogle(){try{const r=await api('/api/google/auth-url');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start Google sign-in');location.href=d.url}catch(e){alert(e.message)}},
  async disconnectGoogle(){if(!confirm('Disconnect your Google Calendar?'))return;try{await api('/api/google/disconnect',{method:'POST'});delete calFeeds[MYID];await refreshGoogleStatus();render()}catch(e){alert('Could not disconnect.')}},
+ async signInDocusign(){try{const r=await api('/api/docusign/auth-url');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start DocuSign sign-in');location.href=d.url}catch(e){alert(e.message)}},
+ async disconnectDocusign(){if(!confirm('Disconnect the company DocuSign account? No one will be able to send proposals for signature until it\'s reconnected.'))return;try{await api('/api/docusign/disconnect',{method:'POST'});await refreshDocusignStatus();render()}catch(e){alert('Could not disconnect.')}},
  callLead(id){const l=S.leads.find(x=>x.id===id);if(l)zoomCall(l.owner)},
  callAcct(id){const a=S.accts.find(x=>x.id===id);if(a)zoomCall(a.owner)},
  saveRates(){document.querySelectorAll('.rt').forEach(i=>S.cfg.rates[i.dataset.s]=Number(i.value)||0);
@@ -470,23 +487,41 @@ function wonCheck(d){lostCheck(d);if(d.lastStage!==d.stage){if(d.lastStage)logEv
 async function doDownload(f,data){if(dl){try{await dl.save({filename:f,data});return}catch(e){if(e&&e.code==='declined')return}}
  const u=URL.createObjectURL(new Blob([data]));const a=document.createElement('a');a.href=u;a.download=f;a.click()}
 /* ===== Proposal generator ===== */
-function propOpen(id){let name='',email='',owner=S.users[0]?.id,sel=[],notes='Summit Creative Group, LLC will provide full-service campaign execution, transparent monthly reporting, and dedicated Treasure Valley account management.';
- if(id[0]==='L'){const l=S.leads.find(x=>x.id===id.slice(1));if(l){name=l.company;email=l.email;owner=l.owner;sel=l.services}}
- if(id[0]==='D'){const d=S.deals.find(x=>x.id===id.slice(1));if(d){name=d.account;email=d.email;owner=d.owner;sel=d.services||[]}}
- openModal(`<div class="row"><h3>Summit Creative Group, LLC</h3><div class="s">Quote #SCG-${Math.floor(1000+Math.random()*9000)}<br>${new Date().toLocaleDateString()}</div></div>
- <label style="margin-top:10px">Prepared for</label><input id="pn" value="${esc(name)}"><label>Client email</label><input id="pe" value="${esc(email)}"><label>Prepared by</label><input id="po" value="${esc(uName(owner))}">
+function propOpen(id){let name='',email='',contact='',owner=S.users[0]?.id,sel=[],notes='Summit Creative Group, LLC will provide full-service campaign execution, transparent monthly reporting, and dedicated Treasure Valley account management.';
+ if(id[0]==='L'){const l=S.leads.find(x=>x.id===id.slice(1));if(l){name=l.company;email=l.email;contact=l.contact||'';owner=l.owner;sel=l.services}}
+ if(id[0]==='D'){const d=S.deals.find(x=>x.id===id.slice(1));if(d){name=d.account;email=d.email;contact=d.contact||'';owner=d.owner;sel=d.services||[]}}
+ const qnum=Math.max(2000,...S.props.map(x=>x.num),1999)+1;
+ openModal(`<div class="row"><h3>Summit Creative Group, LLC</h3><div class="s">Quote #SCG-${qnum}<br>${new Date().toLocaleDateString()}</div></div>
+ <label style="margin-top:10px">Prepared for</label><input id="pn" value="${esc(name)}"><label>Signer name (for e-signature)</label><input id="pc" value="${esc(contact)}"><label>Client email</label><input id="pe" value="${esc(email)}"><label>Prepared by</label><input id="po" value="${esc(uName(owner))}">
  <label>Services (check + edit price)</label>${SRV.map(s=>`<div class="li"><input type="checkbox" class="pc" data-s="${esc(s)}" ${sel.includes(s)?'checked':''}><span>${esc(s)}${isMonthly(s)?'':' <span class="s">(one-time)</span>'}</span><input type="number" class="pr" value="${rate(s)}"></div>`).join('')}
  <div class="row"><div style="flex:1"><label>One-time setup ($)</label><input id="ps" type="number" value="0"></div><div style="flex:1"><label>Discount ($)</label><input id="pd" type="number" value="0"></div></div>
  <label>Scope</label><textarea id="pt" rows="3">${esc(notes)}</textarea><h3 id="ptot" style="text-align:right"></h3>
- <div class="acts np"><button onclick="print()">🖨 Print / PDF</button><button class="bg" id="pmail">📧 Email</button><button class="b2" id="pcopy">📋 Copy</button><button class="bg" id="psave">💾 Save proposal</button><button class="b2" data-a="close">Close</button></div>`);
- const calc=()=>{let m=0,ot=0;const items=[];document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const p=Number(document.querySelectorAll('.pr')[i].value)||0;if(isMonthly(c.dataset.s)){m+=p;items.push(`• ${c.dataset.s}: ${$(p)}/mo`)}else{ot+=p;items.push(`• ${c.dataset.s}: ${$(p)} one-time`)}}});
-  const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0,tot=Math.max(0,m+ot+setup-disc);el('ptot').textContent=`Monthly ${$(m)} • Total investment ${$(tot)}`;
-  return`SUMMIT CREATIVE GROUP, LLC — PROPOSAL\nPrepared for: ${el('pn').value}\nPrepared by: ${el('po').value}\n\n${items.join('\n')||'• Custom package'}\n${setup?`• One-time setup: ${$(setup)}\n`:''}${disc?`• Discount: -${$(disc)}\n`:''}\nTOTAL INVESTMENT: ${$(tot)}\n\n${el('pt').value}`};
+ <div class="acts np"><button onclick="print()">🖨 Print / PDF</button><button class="bg" id="pmail">📧 Email</button><button class="b2" id="pcopy">📋 Copy</button><button class="bg" id="psave">💾 Save proposal</button>${docusignStatus.connected?`<button class="bg" id="psign">✍️ Send for Signature</button>`:''}<button class="b2" data-a="close">Close</button></div>`);
+ const build=()=>{const items=[];let m=0,ot=0;document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const pr=Number(document.querySelectorAll('.pr')[i].value)||0;const mo=isMonthly(c.dataset.s);if(mo)m+=pr;else ot+=pr;items.push({s:c.dataset.s,p:pr,monthly:mo})}});
+  const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0;
+  return{num:qnum,client:el('pn').value,email:el('pe').value,contact:el('pc').value,preparedBy:el('po').value,dealId:id[0]==='D'?id.slice(1):'',items,setup,oneTime:ot,disc,monthly:m,total:Math.max(0,m+ot+setup-disc),notes:el('pt').value,date:today(),owner:(S.users.find(u=>u.name===el('po').value)||{}).id}};
+ const calc=()=>{const p=build();el('ptot').textContent=`Monthly ${$(p.monthly)} • Total investment ${$(p.total)}`;
+  const items=p.items.map(i=>`• ${i.s}: ${$(i.p)}${i.monthly?'/mo':' one-time'}`);
+  return`SUMMIT CREATIVE GROUP, LLC — PROPOSAL\nPrepared for: ${p.client}\nPrepared by: ${p.preparedBy}\n\n${items.join('\n')||'• Custom package'}\n${p.setup?`• One-time setup: ${$(p.setup)}\n`:''}${p.disc?`• Discount: -${$(p.disc)}\n`:''}\nTOTAL INVESTMENT: ${$(p.total)}\n\n${p.notes}`};
  el('mbox').oninput=calc;calc();
  el('pmail').onclick=()=>{location.href=`mailto:${el('pe').value}?subject=${encodeURIComponent('Summit Creative Group Proposal – '+el('pn').value)}&body=${encodeURIComponent(calc())}`};
- el('psave').onclick=()=>{const items=[];let m=0,ot=0;document.querySelectorAll('.pc').forEach((c,i)=>{if(c.checked){const pr=Number(document.querySelectorAll('.pr')[i].value)||0;const mo=isMonthly(c.dataset.s);if(mo)m+=pr;else ot+=pr;items.push({s:c.dataset.s,p:pr,monthly:mo})}});const setup=Number(el('ps').value)||0,disc=Number(el('pd').value)||0;
- const rec={id:uid(),num:Math.max(2000,...S.props.map(x=>x.num))+1,client:el('pn').value,email:el('pe').value,dealId:id[0]==='D'?id.slice(1):'',items,setup,oneTime:ot,disc,monthly:m,total:Math.max(0,m+ot+setup-disc),notes:el('pt').value,status:'Draft',date:today(),owner:(S.users.find(u=>u.name===el('po').value)||{}).id};
- S.props.unshift(rec);if(rec.dealId)logEv('D'+rec.dealId,'Proposal '+rec.num+' saved ('+$(m)+'/mo)');save('props');alert('Saved as proposal '+rec.num)};el('pcopy').onclick=()=>navigator.clipboard.writeText(calc()).then(()=>alert('Copied'),()=>alert('Copy blocked by browser'))}
+ const saveRec=(extra)=>{const p=build();const rec={id:uid(),status:'Draft',...p,...extra};S.props.unshift(rec);if(rec.dealId)logEv('D'+rec.dealId,'Proposal '+rec.num+' saved ('+$(p.monthly)+'/mo)');save('props');return rec};
+ el('psave').onclick=()=>{const rec=saveRec();alert('Saved as proposal '+rec.num)};
+ if(el('psign'))el('psign').onclick=async()=>{
+  const p=build();
+  if(!p.email)return alert('Add the client\'s email first.');
+  if(!confirm(`Send this proposal to ${p.contact||p.client} <${p.email}> for signature via DocuSign?\n\nTotal investment: ${$(p.total)}\n\nThis sends a real, binding signature request — it can't be unsent.`))return;
+  const btn=el('psign');btn.disabled=true;btn.textContent='Sending…';
+  try{
+   const r=await api('/api/docusign/send',{method:'POST',body:JSON.stringify({proposal:p,recipientEmail:p.email,recipientName:p.contact||p.client})});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not send for signature');
+   const rec=saveRec({status:'Sent',docusignEnvelopeId:d.envelopeId,docusignStatus:d.status});
+   if(rec.dealId)logEv('D'+rec.dealId,'📑 Sent proposal '+rec.num+' for e-signature');
+   alert('Sent! '+(p.contact||p.client)+' will get an email from DocuSign to sign.');closeM();
+  }catch(e){alert('Could not send for signature: '+e.message)}
+  finally{btn.disabled=false;btn.textContent='✍️ Send for Signature'}
+ };
+ el('pcopy').onclick=()=>navigator.clipboard.writeText(calc()).then(()=>alert('Copied'),()=>alert('Copy blocked by browser'))}
 
 /* ===== Email templates, recurring invoices, client portal ===== */
 const NL=String.fromCharCode(10), today=()=>new Date().toISOString().slice(0,10);
@@ -571,7 +606,8 @@ Object.assign(A,{
  togDeliv(id){const d=S.deliv.find(x=>x.id===id);d.done=!d.done;if(d.done){d.doneAt=new Date().toISOString();logEv('C'+d.acct,'📦 Delivered: '+d.title);if(d.repeat==='Monthly'&&d.due&&!S.deliv.some(x=>x.prev===d.id))S.deliv.push({...d,id:uid(),prev:d.id,done:false,doneAt:null,due:addMonth(d.due,d.due.slice(8,10))})}save('deliv');if(el('modal').style.display==='block'&&window._da)A.deliv(window._da)},
  delDeliv(id){S.deliv=S.deliv.filter(x=>x.id!==id);save('deliv');A.deliv(window._da)},
  editAcct(id){const a=S.accts.find(x=>x.id===id);form('Edit Client',[{k:'name',l:'Business name'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'owner',l:'Account manager',t:'sel',o:owners()},{k:'retainer',l:'Monthly retainer ($)',t:'number'},{k:'renewal',l:'Contract renewal date',t:'date'},{k:'status',l:'Status',t:'sel',o:['Active','Churned']}],a,o=>{if(!o.name)return alert('Name required')&&false;if(a.status!==o.status)logEv('C'+id,'Status → '+o.status);Object.assign(a,o);save('accts')})},
- props(){openModal(`<h3>📑 Proposals</h3>${S.props.map(p=>`<div class="card"><div class="row"><div><div class="t">#${p.num} • ${esc(p.client)}</div><div class="s">${$(p.monthly)}/mo + ${$(p.setup)} setup • ${esc(p.date)}</div><div class="s">${p.items.map(i=>esc(i.s)).join(', ')}</div></div><select data-c="pstat" data-id="${p.id}" style="width:auto">${['Draft','Sent','Accepted','Declined'].map(x=>`<option ${x===p.status?'selected':''}>${x}</option>`).join('')}</select></div><div class="acts">${p.status!=='Accepted'?`<button class="bg" data-a="accept" data-id="${p.id}">✅ Accept → Client + recurring invoice</button>`:'<span class="badge o">Converted</span>'}<button class="bd" data-a="delProp" data-id="${p.id}">🗑️</button></div></div>`).join('')||'<p class="s">No saved proposals. Use 💾 Save proposal inside a quote.</p>'}<button class="b2" data-a="close">Close</button>`)},
+ props(){openModal(`<h3>📑 Proposals</h3>${S.props.map(p=>`<div class="card"><div class="row"><div><div class="t">#${p.num} • ${esc(p.client)}</div><div class="s">${$(p.monthly)}/mo + ${$(p.setup)} setup • ${esc(p.date)}</div><div class="s">${p.items.map(i=>esc(i.s)).join(', ')}</div>${p.docusignEnvelopeId?`<div class="s">✍️ DocuSign: <b>${esc(p.docusignStatus||'sent')}</b></div>`:''}</div><select data-c="pstat" data-id="${p.id}" style="width:auto">${['Draft','Sent','Accepted','Declined'].map(x=>`<option ${x===p.status?'selected':''}>${x}</option>`).join('')}</select></div><div class="acts">${p.status!=='Accepted'?`<button class="bg" data-a="accept" data-id="${p.id}">✅ Accept → Client + recurring invoice</button>`:'<span class="badge o">Converted</span>'}${p.docusignEnvelopeId?`<button class="b2" data-a="checkSig" data-id="${p.id}">🔄 Check signature status</button>`:''}<button class="bd" data-a="delProp" data-id="${p.id}">🗑️</button></div></div>`).join('')||'<p class="s">No saved proposals. Use 💾 Save proposal inside a quote.</p>'}<button class="b2" data-a="close">Close</button>`)},
+ async checkSig(id){const p=S.props.find(x=>x.id===id);if(!p?.docusignEnvelopeId)return;try{const r=await api('/api/docusign/envelope/'+p.docusignEnvelopeId);const d=await r.json();if(!r.ok)throw new Error(d.error);p.docusignStatus=d.status;save('props');if(d.status==='completed'&&p.status!=='Accepted'){A.accept(id);alert('Signed! Converted to client + recurring invoice.')}else A.props()}catch(e){alert('Could not check status: '+e.message)}},
  delProp(id){S.props=S.props.filter(x=>x.id!==id);save('props');A.props()},
  accept(id){const p=S.props.find(x=>x.id===id);if(!p||p.status==='Accepted')return;p.status='Accepted';let d=S.deals.find(x=>x.id===p.dealId);
   if(!d){d={id:uid(),name:p.client+' – proposal '+p.num,account:p.client,email:p.email,owner:p.owner||S.users[0]?.id,stage:S.cfg.stages[0],amount:p.monthly,close:today(),services:p.items.map(i=>i.s),source:'Unknown'};S.deals.unshift(d)}

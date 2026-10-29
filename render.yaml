@@ -16,3 +16,9 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      - key: DOCUSIGN_INTEGRATION_KEY
+        sync: false
+      - key: DOCUSIGN_CLIENT_SECRET
+        sync: false
+      - key: DOCUSIGN_REDIRECT_URI
+        sync: false
