@@ -149,7 +149,14 @@ function save(...ks){lastLocal=Date.now();render();pushData(ks)}
 async function pushData(ks){try{
  try{const r=await api('/api/data');const fresh=await r.json();
   const touched=new Set(ks&&ks.length?ks:KEYS);touched.add('audit');let picked=false;
-  KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
+  // Skip overlaying "untouched" keys with the fresh copy while an edit modal
+  // is open (see pullData's comment below for why this matters): some other
+  // save happening in the background — a recurring-invoice run, another
+  // tab's edit synced in, etc. — must not replace an array that an open
+  // form's Save button is holding a direct reference into.
+  if(el('modal').style.display!=='block'){
+   KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
+  }
   if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
  }catch(e){}
  await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'
@@ -162,6 +169,21 @@ async function pullData(quiet){try{const r=await api('/api/data');const d=await 
  // but still merge the incoming data so it isn't silently dropped. (A previous version
  // skipped the merge too, so leaving a search/filter box focused meant this tab never
  // picked up changes made elsewhere, even hours later — looked like "sync is broken".)
+ //
+ // Separately: an open edit form (Edit Deal, Edit Lead, …) holds a direct
+ // object reference to the record it's editing, captured when the form was
+ // opened, and its Save button does Object.assign(thatRecord, newValues) —
+ // it doesn't look the record up again by id. merge() replaces S's arrays
+ // wholesale with freshly-fetched ones, which are NEW objects even when the
+ // data is identical. If that happens while the form is still open (any
+ // poll after the first 10 seconds), the form's reference becomes a stale
+ // copy no longer inside S — Save then edits a now-orphaned object, the
+ // screen still shows the old value, and the next write silently overwrites
+ // the server with the unedited data. Bug report: editing a Closed Won
+ // deal's Amount appeared to do nothing. Skip the merge entirely — not just
+ // the re-render — while any modal is open; it resumes on the next poll
+ // after Save or Cancel closes it.
+ if(el('modal').style.display==='block')return;
  const a=document.activeElement,tag=a&&a.tagName;
  merge(d);el('sync').textContent='● shared';
  if(tag==='INPUT'||tag==='TEXTAREA')return;
