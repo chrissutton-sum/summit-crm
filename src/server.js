@@ -24,6 +24,7 @@ app.post('/api/login', async (req, res) => {
   if (!account) return res.status(401).json({ error: 'Invalid username or password' });
   const ok = await bcrypt.compare(password, account.password_hash);
   if (!ok) return res.status(401).json({ error: 'Invalid username or password' });
+  if (account.active === false) return res.status(403).json({ error: 'This login has been deactivated. Ask an admin to reactivate it.' });
   res.json({
     token: signToken(account),
     username: account.username,
@@ -75,6 +76,24 @@ app.patch('/api/accounts/admin', requireAuth, requireAdmin, async (req, res) => 
   res.json({ ok: true });
 });
 
+// Admins temporarily deactivate/reactivate a login. A deactivated login is
+// blocked immediately (requireAuth checks this on every request, not just at
+// sign-in) and is blocked from signing back in until reactivated. The
+// underlying account and its data are untouched either way.
+app.patch('/api/accounts/active', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, active } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  if (req.account.userId === userId && !active) {
+    return res.status(400).json({ error: "You can't deactivate your own login." });
+  }
+  const { rows } = await pool.query(
+    'UPDATE accounts SET active = $1 WHERE user_id = $2 RETURNING user_id',
+    [!!active, userId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'That user has no login to deactivate.' });
+  res.json({ ok: true });
+});
+
 // Admins remove a login entirely (e.g. when removing a team member).
 app.delete('/api/accounts/:userId', requireAuth, requireAdmin, async (req, res) => {
   await pool.query('DELETE FROM accounts WHERE user_id = $1', [req.params.userId]);
@@ -82,7 +101,7 @@ app.delete('/api/accounts/:userId', requireAuth, requireAdmin, async (req, res) 
 });
 
 app.get('/api/accounts', requireAuth, requireAdmin, async (req, res) => {
-  const { rows } = await pool.query('SELECT username, user_id, is_admin, created_at FROM accounts ORDER BY created_at');
+  const { rows } = await pool.query('SELECT username, user_id, is_admin, active, created_at FROM accounts ORDER BY created_at');
   res.json(rows);
 });
 

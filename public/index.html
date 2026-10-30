@@ -113,7 +113,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false};
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={};
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -128,7 +128,9 @@ function merge(d){KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]})}
 /* ===== Auth + REST persistence (replaces the old claude.ai db capability) ===== */
 let TOKEN=null,MYID=null,MYNAME=null,IS_ADMIN=false;
 const api=async(path,opts={})=>{const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{}),...(opts.headers||{})}});
- if(r.status===401){doLogout();throw new Error('Session expired')}return r};
+ if(r.status===401){doLogout();throw new Error('Session expired')}
+ if(r.status===403&&path==='/api/data'){doLogout();alert('This login has been deactivated. Ask an admin to reactivate it.');throw new Error('Account deactivated')}
+ return r};
 function doLogout(){TOKEN=null;try{localStorage.removeItem('summit_token')}catch(e){}el('app').style.display='none';el('loginScreen').style.display='flex';el('loginPass').value=''}
 async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').value;el('loginErr').textContent='';
  if(!u||!p){el('loginErr').textContent='Enter a username and password.';return}
@@ -216,12 +218,22 @@ async function syncCalendars(force){
 async function refreshDocusignStatus(){
  try{const r=await api('/api/docusign/status');const d=await r.json();docusignStatus={configured:!!d.configured,connected:!!d.connected,email:d.email||''}}catch(e){}
 }
+// Which S.users have a login, and whether it's currently active — admin-only
+// (the server rejects this for non-admins). Drives the Settings → Team
+// Active/Inactive badge+toggle and the "(Inactive)" suffix in owner pickers.
+async function refreshAccountsStatus(){
+ if(!IS_ADMIN){accountsStatus={};return}
+ try{const r=await api('/api/accounts');const d=await r.json();
+  const m={};d.forEach(a=>m[a.user_id]={active:a.active!==false,username:a.username,isAdmin:a.is_admin});
+  accountsStatus=m}catch(e){}
+}
 async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
  await refreshGoogleStatus();
  await refreshDocusignStatus();
+ await refreshAccountsStatus();
  init();
  handleGoogleRedirect();
  handleDocusignRedirect();
@@ -426,7 +438,8 @@ function vInv0(){
  return`<div class="row" style="margin-bottom:10px"><h2>Invoices</h2><div><button class="b2" data-a="csv" data-id="invoices">⬇ CSV</button> <button data-a="newInv">+ Invoice</button></div></div>
  <input placeholder="Search…" value="${esc(window._iq||'')}" data-c="iq" style="margin-bottom:10px">`+(I.map(i=>{const late=!i.paid&&i.due&&new Date(i.due)<new Date();return`<div class="card"><div class="row"><div><div class="t">INV-${i.num} • ${esc(i.client)}</div><div class="s">${esc(i.desc)} • due ${esc(i.due||'—')}</div></div><div><b>${$(i.amount)}</b> <span class="badge ${i.paid?'o':late?'r':''}">${i.paid?'PAID':late?'OVERDUE':'UNPAID'}</span></div></div><div class="acts"><button class="b2" data-a="paid" data-id="${i.id}">${i.paid?'↩ Mark unpaid':'✅ Mark paid'}</button><button class="bg" data-a="showInv" data-id="${i.id}">🖨 View / Print</button><button class="b2" data-a="emailInv" data-id="${i.id}">✉️ Email</button><button class="bd" data-a="delInv" data-id="${i.id}">🗑️</button></div></div>`}).join('')||'<div class="card s">No invoices yet.</div>')}
 function vSet(){
- return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>`<div class="row" style="align-items:center;margin:6px 0"><div><b>${uDot(u.id)}${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
+ return`<h2 style="margin-bottom:10px">Settings</h2><div class="card"><div class="t">Team</div>${S.users.map(u=>{const acct=accountsStatus[u.id],inactive=acct&&!acct.active;
+  return`<div class="row" style="align-items:center;margin:6px 0${inactive?';opacity:.6':''}"><div><b>${uDot(u.id)}${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}${inactive?' <span class="badge r">Inactive</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> ${acct?(u.id===MYID?'':`<button class="b2" data-a="toggleActive" data-id="${u.id}">${inactive?'✅ Reactivate':'🚫 Deactivate'}</button>`):''} <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`}).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
 </div>
  <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
@@ -437,7 +450,7 @@ function vSet(){
  <div class="card"><div class="t">Lists (comma separated)</div><label style="margin-top:8px">Deal stages — last two must be Won, then Lost</label><textarea id="sst" rows="2">${esc(S.cfg.stages.join(', '))}</textarea><label>Lead statuses</label><textarea id="sdp" rows="2">${esc(S.cfg.disps.join(', '))}</textarea><label>Onboarding template</label><textarea id="sob" rows="3">${esc(S.cfg.onboard.join(', '))}</textarea><button data-a="saveLists">Save lists</button></div>
  ${tplCard()}${webCard()}${ioCard()}${auditCard()}<div class="card"><div class="t">Backup</div><div class="acts" style="border:0"><button class="b2" data-a="csv" data-id="backup">⬇ JSON backup</button><button class="bd" data-a="reset">⚠ Reset all data</button></div></div>`}
 /* ===== Actions ===== */
-const owners=()=>S.users.map(u=>[u.id,u.name]);
+const owners=()=>S.users.map(u=>[u.id,u.name+(accountsStatus[u.id]&&!accountsStatus[u.id].active?' (Inactive)':'')]);
 const camps=()=>[['','— No campaign —']].concat(S.campaigns.map(c=>[c.id,c.name]));
 const CSTAT=['Planned','Active','Paused','Completed'];
 const A={
@@ -508,13 +521,20 @@ const A={
   const password=prompt('Temporary password (min 8 characters) — share this with '+u.name+', they can change it from Settings:')||'';if(password.length<8)return alert('Password must be at least 8 characters.');
   try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id,isAdmin:u.level==='admin'})});const d=await r.json();
    if(!r.ok)return alert(d.error||'Could not create login.');
+   await refreshAccountsStatus();render();
    alert('Login created. Username: '+username+'  Password: '+password+(u.level==='admin'?'\n\nThey\'ll see admin controls once they sign in.':''))}catch(e){alert('Could not reach the server.')}},
  async changePw(){const oldPassword=el('pwOld').value,newPassword=el('pwNew').value;el('pwErr').textContent='';
   if(!oldPassword||newPassword.length<8){el('pwErr').textContent='Enter your current password and a new one of at least 8 characters.';return}
   try{const r=await api('/api/me/password',{method:'POST',body:JSON.stringify({oldPassword,newPassword})});const d=await r.json();
    if(!r.ok){el('pwErr').textContent=d.error||'Could not change password.';return}
    alert('Password changed.');render()}catch(e){el('pwErr').textContent='Could not reach the server.'}},
- async delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users');try{await api('/api/accounts/'+id,{method:'DELETE'})}catch(e){}},
+ async delUser(id){if(S.users.length<2)return alert('Keep at least one user.');const own=[...S.leads,...S.deals,...S.acts,...S.accts].some(x=>x.owner===id);if(!confirm(own?'This user owns records; they will show as Unassigned. Remove anyway?':'Remove user?'))return;S.users=S.users.filter(u=>u.id!==id);save('users');try{await api('/api/accounts/'+id,{method:'DELETE'});delete accountsStatus[id];render()}catch(e){}},
+ async toggleActive(id){const u=S.users.find(x=>x.id===id),acct=accountsStatus[id];if(!u||!acct)return;
+  const makeActive=!acct.active;
+  if(!confirm(makeActive?`Reactivate ${u.name}'s login? They'll be able to sign in again right away.`:`Deactivate ${u.name}'s login? They'll be signed out and unable to sign back in until you reactivate them. Their records stay exactly as they are.`))return;
+  try{const r=await api('/api/accounts/active',{method:'PATCH',body:JSON.stringify({userId:id,active:makeActive})});const d=await r.json();
+   if(!r.ok)return alert(d.error||'Could not update this login.');
+   await refreshAccountsStatus();render()}catch(e){alert('Could not reach the server.')}},
  saveIcs(){const v=el('icsUrl').value.trim();const u=ME();if(!u)return;if(v&&!/^https?:\/\//i.test(v))return alert('That doesn\'t look like a link — it should start with https://');u.icsUrl=v;delete calFeeds[u.id];save('users');if(v)syncCalendars(true);alert(v?'Calendar link saved. It will show up on the Shared Calendar.':'Calendar link cleared.')},
  clearIcs(){const u=ME();if(!u)return;delete u.icsUrl;delete calFeeds[u.id];save('users');render()},
  syncCal(){syncCalendars(true)},

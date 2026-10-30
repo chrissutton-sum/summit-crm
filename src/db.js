@@ -68,6 +68,10 @@ async function init() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Added later: lets an admin temporarily block a team member's login
+  // without deleting their account. Non-destructive on the existing table —
+  // every pre-existing row just gets active=true, same as before this column existed.
+  await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_data (
       id INTEGER PRIMARY KEY DEFAULT 1,
