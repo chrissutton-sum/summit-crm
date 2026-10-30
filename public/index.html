@@ -290,7 +290,13 @@ const $$=n=>Math.round(n).toLocaleString();
 const TABS=[['dash','📊','Analytics'],['camp','📣','Campaigns'],['leads','🎯','Leads'],['contacts','📇','Contacts'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
 function init(){el('nav').innerHTML=TABS.map(t=>`<div data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');render();runRecurring()}
 function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdue();
- const w=el('who'),cur=w.value||'ALL';w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';
+ const w=el('who'),cur=w.value||'ALL';
+ // Switching to a teammate or "All users" shows their data across every tab
+ // (Tasks included) — lock that to Admin-level users. Staff only ever see
+ // their own records; the select is pinned to them and disabled rather than
+ // just hidden, so it's obvious why (not missing).
+ if(isStaff()){w.innerHTML=`<option value="${MYID}">${esc(ME()?.name||'Me')}</option>`;w.value=MYID;w.disabled=true;w.title="Staff can only view their own records."}
+ else{w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';w.disabled=false;w.title=''}
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
  el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
  const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
