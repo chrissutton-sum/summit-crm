@@ -559,12 +559,21 @@ let AS=null,MCP=false;const SOURCES=['Website','Referral','Event','Cold outreach
 function slackNotify(){/* Slack notifications are not wired up in the standalone version. */}
 const ME=()=>S.users.find(u=>u.id===MYID),meName=()=>ME()?.name||MYNAME||'Someone',isStaff=()=>ME()?.level==='staff',hidden=t=>isStaff()&&['inv','set','ins'].includes(t);
 const logEv=(ref,text,loc)=>{S.log.unshift({id:uid(),ref,text,by:meName(),at:new Date().toISOString(),...(loc?{loc}:{})});S.log=S.log.slice(0,600)};
-const aud=text=>{S.audit.unshift({at:new Date().toISOString(),by:meName(),text});S.audit=S.audit.slice(0,300)};
+const aud=text=>{S.audit.unshift({at:new Date().toISOString(),by:meName(),text});S.audit=S.audit.slice(0,2000)};
 function nameOf(id){const f=[[S.leads,'company'],[S.deals,'name'],[S.accts,'name'],[S.tasks,'title'],[S.deliv,'title'],[S.props,'client'],[S.users,'name'],[S.recur,'client'],[S.invoices,'client'],[S.campaigns,'name']];for(const[a,k]of f){const x=a.find(r=>r.id===id||'L'+r.id===id||'D'+r.id===id||'C'+r.id===id||'M'+r.id===id);if(x)return x[k]}return id||''}
 function auditClick(t){const a=t.dataset.a;if(/^(del|mv|convert|paid|actDone|reset|save|addUser|accept|togRecur|togDeliv)/.test(a))aud(a+' · '+nameOf(t.dataset.id))}
 function lostCheck(d){if(d.stage===LOST()&&!d.lossReason)d.lossReason=(prompt('Why was this deal lost? (price, timing, competitor, no response, other)')||'Unspecified').trim();if(d.stage!==LOST())delete d.lossReason}
 const fmt=iso=>new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-function auditCard(){return`<div class="card"><div class="t">Audit Log (last 40)</div>${S.audit.slice(0,40).map(a=>`<div class="s" style="margin:4px 0"><b style="color:var(--tx)">${esc(a.by)}</b> • ${esc(a.text)} <span style="float:right">${esc(fmt(a.at))}</span></div>`).join('')||'<p class="s">No entries yet.</p>'}<p class="s" style="margin-top:8px">Roles hide Invoices, Insights and Settings for Staff users in this interface. They do not stop someone with edit access to the page from changing data directly.</p></div>`}
+function auditCard(){
+ const byUser={};
+ S.audit.forEach(a=>{(byUser[a.by]=byUser[a.by]||[]).push(a)});
+ const order=Object.keys(byUser).sort((x,y)=>byUser[y][0].at<byUser[x][0].at?-1:1);
+ const groups=order.map(name=>{
+  const entries=byUser[name];
+  return`<details style="margin:6px 0;border:1px solid var(--bd);border-radius:7px;padding:8px"><summary style="cursor:pointer;font-weight:600;color:var(--tx)">${esc(name)} <span class="s">(${entries.length})</span></summary>
+  <div style="margin-top:8px;max-height:420px;overflow:auto">${entries.map(a=>`<div class="s" style="margin:4px 0">${esc(a.text)} <span style="float:right">${esc(fmt(a.at))}</span></div>`).join('')}</div></details>`;
+ }).join('')||'<p class="s">No entries yet.</p>';
+ return`<div class="card"><div class="t">Audit Log</div><p class="s" style="margin:2px 0 8px">Grouped by team member — click a name to expand their activity (${S.audit.length} total entries).</p>${groups}<p class="s" style="margin-top:8px">Roles hide Invoices, Insights and Settings for Staff users in this interface. They do not stop someone with edit access to the page from changing data directly.</p></div>`}
 const dueSort=(a,b)=>(a.due||'9')<(b.due||'9')?-1:1;
 function vTasks(){const q=(window._tq||'').toLowerCase();
  const T=S.tasks.filter(mine).filter(k=>!q||k.title.toLowerCase().includes(q)).sort(dueSort),D=S.deliv.filter(d=>mine(d)&&!d.done).filter(d=>!q||d.title.toLowerCase().includes(q)).sort(dueSort);const od=x=>x.due&&x.due<today();
