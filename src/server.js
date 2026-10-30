@@ -270,42 +270,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// One-off: reassign Rachel Bowers' leads to Chris Sutton. Idempotent (only
-// moves leads still owned by Rachel, so a second boot is a harmless no-op).
-// Remove this block once confirmed via the deploy logs.
-async function migrateRachelLeadsToChris() {
-  const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
-  const data = rows[0] ? rows[0].data : null;
-  if (!data) return;
-  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
-  const rachel = (data.users || []).find((u) => norm(u.name).includes('rachelbowers'));
-  const chris = (data.users || []).find((u) => norm(u.name).includes('chrissutton'));
-  if (!rachel || !chris) {
-    console.log('MIGRATE rachel->chris: could not find both users', {
-      rachelFound: !!rachel,
-      chrisFound: !!chris,
-      allUsers: (data.users || []).map((u) => ({ id: u.id, name: u.name })),
-    });
-    return;
-  }
-  const leads = data.leads || [];
-  let moved = 0;
-  leads.forEach((l) => {
-    if (l.owner === rachel.id) {
-      l.owner = chris.id;
-      moved += 1;
-    }
-  });
-  if (moved > 0) {
-    await pool.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
-  }
-  console.log(`MIGRATE rachel->chris: moved ${moved} lead(s) from ${rachel.name} (${rachel.id}) to ${chris.name} (${chris.id})`);
-}
-
 init()
   .then(() => google.initTable())
   .then(() => docusign.initTable())
-  .then(() => migrateRachelLeadsToChris())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
   })
