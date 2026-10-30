@@ -328,13 +328,14 @@ function vLeads(){
  <div class="acts" style="margin-top:10px"><button class="bg" data-a="prop" data-id="L${l.id}">📄 Quote</button><button data-a="convert" data-id="${l.id}">🚀 To Deal</button>${l.phone?`<a class="btn b2" href="tel:${esc(l.phone)}">📞 Call</a><button class="b2" data-a="copyPhone" data-p="${esc(l.phone)}">📋 Copy #</button>`:''}${l.email?`<a class="btn b2" href="mailto:${esc(l.email)}">✉️</a>`:''}<button class="b2" data-a="follow" data-id="${l.id}">📅 Follow-up</button><button class="b2" data-a="emailLead" data-id="${l.id}">✉️ Email</button><button class="b2" data-a="hist" data-id="L${l.id}">🕒</button><button class="b2" data-a="files" data-id="L${l.id}">📎</button><button class="b2" data-a="editLead" data-id="${l.id}">✏️</button><button class="bd" data-a="delLead" data-id="${l.id}">🗑️</button></div>`:''}</div>`}).join('')||'<div class="card s">No leads.</div>')+pager(page,pages,'leadPg')}
 function vContacts(){
  const q=(window._ctq||'').toLowerCase();
- const Kall=S.contacts.filter(mine).filter(k=>!q||(k.name+' '+(k.company||'')+' '+(k.title||'')+' '+(k.phone||'')+' '+(k.email||'')).toLowerCase().includes(q));
+ const Kall=S.contacts.filter(mine).filter(k=>!q||(k.name+' '+(k.company||'')+' '+(k.title||'')+' '+(k.phone||'')+' '+(k.email||'')+' '+(k.address||'')).toLowerCase().includes(q));
  const{items:Kp,page,pages}=paginate(Kall,contactPage);contactPage=page;
  const head=`<div class="row" style="margin-bottom:10px"><h2>Contacts</h2><div><button class="b2" data-a="csv" data-id="contacts">⬇ CSV</button> <button data-a="newContact">+ Contact</button></div></div>
  <input placeholder="Search…" value="${esc(window._ctq||'')}" data-c="ctq" style="margin-bottom:10px">
  <p class="s" style="margin:-2px 0 10px">People worth keeping track of who aren't a sales lead (yet) — referral partners, vendors, networking contacts. Convert one to a Lead once they're worth pursuing.</p>`;
  return head+(Kp.map(k=>`<div class="card"><div class="row"><div><div class="t">${esc(k.name)}</div><div class="s">${esc(k.title||'—')}${k.company?' at '+esc(k.company):''} • ${esc(uName(k.owner))}</div></div>${k.convertedLeadId?'<span class="badge o">Converted</span>':''}</div>
  ${k.phone||k.email?`<div class="s" style="margin-top:4px">${k.phone?'📞 '+esc(k.phone)+' ':''}${k.email?'✉️ '+esc(k.email):''}</div>`:''}
+ ${k.address?`<div class="s" style="margin-top:4px">📍 ${esc(k.address).replace(/\n/g,', ')} <a href="https://maps.google.com/?q=${encodeURIComponent(k.address)}" target="_blank" rel="noopener" style="color:var(--cyan)">🗺️ Map</a></div>`:''}
  ${k.notes?`<p class="s" style="margin-top:6px">📝 ${esc(k.notes)}</p>`:''}
  <div class="acts">${k.phone?`<a class="btn b2" href="tel:${esc(k.phone)}">📞 Call</a><button class="b2" data-a="copyPhone" data-p="${esc(k.phone)}">📋 Copy #</button>`:''}${k.email?`<a class="btn b2" href="mailto:${esc(k.email)}">✉️</a><button class="b2" data-a="emailContact" data-id="${k.id}">✉️ Email</button>`:''}${k.convertedLeadId?'':`<button class="bg" data-a="convertContact" data-id="${k.id}">🚀 To Lead</button>`}<button class="b2" data-a="hist" data-id="K${k.id}">🕒</button><button class="b2" data-a="files" data-id="K${k.id}">📎</button><button class="b2" data-a="editContact" data-id="${k.id}">✏️</button><button class="bd" data-a="delContact" data-id="${k.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No contacts yet.</div>')+pager(page,pages,'contactPg')}
 function vDeals(){
@@ -413,7 +414,7 @@ const A={
  contactPg(dir){contactPage+=+dir;render();scrollTo(0,0)},
  newContact(){A.editContact()},
  editContact(id){const k=S.contacts.find(x=>x.id===id)||{owner:S.users[0]?.id};
-  form(id?'Edit Contact':'New Contact',[{k:'name',l:'Name'},{k:'company',l:'Company'},{k:'title',l:'Title / role'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'notes',l:'Notes',t:'area'}],k,o=>{if(!o.name)return alert('Name required')&&false;if(id)Object.assign(k,o);else S.contacts.unshift({id:uid(),...o});save('contacts')})},
+  form(id?'Edit Contact':'New Contact',[{k:'name',l:'Name'},{k:'company',l:'Company'},{k:'title',l:'Title / role'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'address',l:'Address',t:'area'},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'notes',l:'Notes',t:'area'}],k,o=>{if(!o.name)return alert('Name required')&&false;if(id)Object.assign(k,o);else S.contacts.unshift({id:uid(),...o});save('contacts')})},
  delContact(id){if(confirm('Delete this contact?')){S.contacts=S.contacts.filter(k=>k.id!==id);save('contacts')}},
  emailContact(id){const k=S.contacts.find(x=>x.id===id);emailOpen({ref:'K'+id,client:k.company||k.name,contact:k.name||'there',email:k.email,rep:uName(k.owner),tpl:'Intro follow-up'})},
  convertContact(id){const k=S.contacts.find(x=>x.id===id);if(!k||k.convertedLeadId)return;
@@ -495,7 +496,7 @@ const A={
   if(kind==='leads')rows=[['Company','Contact','Phone','Email','Owner','Status','Value','Services']].concat(S.leads.map(l=>[l.company,l.contact,l.phone,l.email,uName(l.owner),l.disposition,l.value,l.services.join('; ')]));
   if(kind==='deals')rows=[['Deal','Client','Owner','Stage','Amount','Prob%','Close','Services']].concat(S.deals.map(d=>[d.name,d.account,uName(d.owner),d.stage,d.amount,prob(d.stage),d.close,(d.services||[]).join('; ')]));
   if(kind==='invoices')rows=[['Invoice','Client','Description','Amount','Date','Due','Paid']].concat(S.invoices.map(i=>['INV-'+i.num,i.client,i.desc,i.amount,i.date,i.due,i.paid?'Yes':'No']));
-  if(kind==='contacts')rows=[['Name','Company','Title','Phone','Email','Owner','Notes','Converted']].concat(S.contacts.map(k=>[k.name,k.company,k.title,k.phone,k.email,uName(k.owner),k.notes,k.convertedLeadId?'Yes':'No']));
+  if(kind==='contacts')rows=[['Name','Company','Title','Phone','Email','Address','Owner','Notes','Converted']].concat(S.contacts.map(k=>[k.name,k.company,k.title,k.phone,k.email,k.address,uName(k.owner),k.notes,k.convertedLeadId?'Yes':'No']));
   if(kind==='campaigns')rows=[['Name','Channel','Status','Owner','Start','End','Budget','Leads','Deals','Won','Pipeline','WonValue','CostPerLead']].concat(S.campaigns.map(c=>{const leads=S.leads.filter(l=>l.campaign===c.id),deals=S.deals.filter(d=>d.campaign===c.id),won=deals.filter(d=>d.stage===WON()),pipe=deals.filter(isOpen).reduce((t,d)=>t+d.amount,0),wonVal=won.reduce((t,d)=>t+d.amount,0);return[c.name,c.channel,c.status,uName(c.owner),c.start,c.end,c.budget,leads.length,deals.length,won.length,pipe,wonVal,leads.length?Math.round((Number(c.budget)||0)/leads.length):0]}));
   doDownload(`summit_${name}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'))}
 };
