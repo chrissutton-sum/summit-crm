@@ -302,13 +302,19 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
 function vDash(){
  const D=S.deals.filter(mine),open=D.filter(isOpen),pipe=open.reduce((t,d)=>t+d.amount,0),wtd=open.reduce((t,d)=>t+d.amount*prob(d.stage)/100,0);
- const won=D.filter(d=>d.stage===WON()).reduce((t,d)=>t+d.amount,0),A=S.acts.filter(a=>!a.done&&mine(a)),od=A.filter(dueNow).length;
+ const won=D.filter(d=>d.stage===WON()).reduce((t,d)=>t+d.amount,0);
+ // "Open Tasks" below was actually counting S.acts (Calendar meetings/
+ // follow-ups/calls) instead of S.tasks — so it could show a number here
+ // while the Tasks tab (which lists S.tasks + S.deliv) showed nothing.
+ // Count the same things the Tasks tab actually shows.
+ const openT=S.tasks.filter(k=>!k.done&&mine(k)),openD=S.deliv.filter(d=>!d.done&&mine(d));
+ const taskCount=openT.length+openD.length,od=openT.filter(k=>k.due&&k.due<today()).length+openD.filter(d=>d.due&&d.due<today()).length;
  const stMax=Math.max(1,...S.cfg.stages.map(s=>D.filter(d=>d.stage===s).reduce((t,d)=>t+d.amount,0)));
  const cnt={};[...S.leads.filter(mine),...D].forEach(x=>(x.services||[]).forEach(s=>cnt[s]=(cnt[s]||0)+1));const cm=Math.max(1,...Object.values(cnt));
  const uv=S.users.map(u=>({u,v:S.deals.filter(d=>d.owner===u.id&&isOpen(d)).reduce((t,d)=>t+d.amount,0)})),um=Math.max(1,...uv.map(x=>x.v));
  const unpaid=S.invoices.filter(i=>!i.paid).reduce((t,i)=>t+i.amount,0);
  return`<div class="row" style="margin-bottom:12px"><h2>Executive Command</h2><div><button data-a="newLead">+ Lead</button> <button class="bg" data-a="prop" data-id="blank">📄 Blank Quote</button></div></div>
- <div class="kpis"><div class="kpi">Open Pipeline<b>${$(pipe)}</b></div><div class="kpi">Weighted<b>${$(wtd)}</b></div><div class="kpi">Won<b style="color:var(--ok)">${$(won)}</b></div><div class="kpi">Open Tasks<b style="color:var(--gold)">${A.length}${od?` <small style="color:#f87171">(${od} due)</small>`:''}</b></div></div>
+ <div class="kpis"><div class="kpi">Open Pipeline<b>${$(pipe)}</b></div><div class="kpi">Weighted<b>${$(wtd)}</b></div><div class="kpi">Won<b style="color:var(--ok)">${$(won)}</b></div><div class="kpi">Open Tasks<b style="color:var(--gold)">${taskCount}${od?` <small style="color:#f87171">(${od} overdue)</small>`:''}</b></div></div>
  <div class="g2"><div class="card"><div class="t">Pipeline by Stage</div>${S.cfg.stages.map(s=>{const l=D.filter(d=>d.stage===s);return bar(`${esc(s)} (${l.length})`,$(l.reduce((t,d)=>t+d.amount,0)),1,s===WON()?'g':s===LOST()?'y':'').replace(/width:[^"]*/,`width:${Math.max(l.length?6:0,l.reduce((t,d)=>t+d.amount,0)/stMax*100)}%`)}).join('')}</div>
  <div class="card"><div class="t">Service Demand</div>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([s,c])=>bar(esc(s),c,cm)).join('')||'<p class="s">Tag services on leads or deals.</p>'}</div></div>
  <div class="card"><div class="t">Team Leaderboard</div>${uv.map(x=>bar(`${esc(x.u.name)} <span class="s">${esc(x.u.role)}</span>`,$(x.v),1,'y').replace(/width:[^"]*/,`width:${Math.max(x.v?5:0,x.v/um*100)}%`)).join('')}<div class="s">Unpaid invoices: <b style="color:var(--gold)">${$(unpaid)}</b></div></div>`}
