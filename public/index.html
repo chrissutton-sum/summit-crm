@@ -113,7 +113,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={};
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, insActiveOpen=false;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -497,6 +497,8 @@ const A={
  addStep(id){const i=el('ns_'+id),t=i.value.trim();if(!t)return;S.accts.find(x=>x.id===id).steps.push({id:uid(),text:t,done:false});save('accts')},
  delAcct(id){if(confirm('Delete client?')){S.accts=S.accts.filter(a=>a.id!==id);save('accts')}},
  toggleAcct(id){openAccts.has(id)?openAccts.delete(id):openAccts.add(id);render()},
+ toggleActiveClients(){insActiveOpen=!insActiveOpen;render()},
+ gotoClient(id){const a=S.accts.find(x=>x.id===id);if(!a)return;window._clq=a.name;clientPage=0;openAccts.add(id);tab='clients';render();scrollTo(0,0)},
  expandAllAccts(){S.accts.filter(mine).forEach(a=>openAccts.add(a.id));render()},
  collapseAllAccts(){openAccts.clear();render()},
  toggleLead(id){openLeads.has(id)?openLeads.delete(id):openLeads.add(id);render()},
@@ -667,7 +669,8 @@ function vIns(){const AC=S.accts.filter(a=>a.status!=='Churned'),mrr=AC.reduce((
  const bs={};S.deals.filter(d=>d.stage===WON()).forEach(d=>{const sv=d.services||[],tot=sum(sv)||1;sv.forEach(x=>bs[x]=(bs[x]||0)+d.amount*rate(x)/tot)});const bm=Math.max(1,...Object.values(bs));
  const src={};S.leads.forEach(l=>{const k=l.source||'Unknown';(src[k]=src[k]||{l:0,w:0,x:0}).l++});S.deals.forEach(d=>{const o=src[d.source||'Unknown']=src[d.source||'Unknown']||{l:0,w:0,x:0};if(d.stage===WON())o.w++;if(d.stage===LOST())o.x++});
  const lr={};S.deals.filter(d=>d.stage===LOST()).forEach(d=>{const k=d.lossReason||'Unspecified';lr[k]=(lr[k]||0)+1});const lm=Math.max(1,...Object.values(lr));
- return`<h2 style="margin-bottom:10px">Retention & Insights</h2><div class="kpis"><div class="kpi">MRR<b>${$(mrr)}</b></div><div class="kpi">ARR run-rate<b>${$(mrr*12)}</b></div><div class="kpi">Active clients<b>${AC.length}</b></div><div class="kpi">At risk<b style="color:${risk.length?'#f87171':'var(--ok)'}">${risk.length}</b></div></div>
+ return`<h2 style="margin-bottom:10px">Retention & Insights</h2><div class="kpis"><div class="kpi">MRR<b>${$(mrr)}</b></div><div class="kpi">ARR run-rate<b>${$(mrr*12)}</b></div><div class="kpi" data-a="toggleActiveClients" style="cursor:pointer">Active clients ${insActiveOpen?'▾':'▸'}<b>${AC.length}</b></div><div class="kpi">At risk<b style="color:${risk.length?'#f87171':'var(--ok)'}">${risk.length}</b></div></div>
+ ${insActiveOpen?`<div class="card" style="margin-top:-2px">${AC.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>`<div class="row s" style="color:var(--tx);margin:6px 0;cursor:pointer" data-a="gotoClient" data-id="${a.id}"><span>${uTag(a.owner)} ${esc(a.name)}</span><b style="color:var(--cyan)">${$(a.retainer)}/mo</b></div>`).join('')||'<p class="s">No active clients yet.</p>'}</div>`:''}
  <div class="g2"><div class="card"><div class="t">⚠ At risk (no touch in 30+ days)</div>${risk.map(a=>`<div class="row s" style="color:var(--tx);margin:6px 0"><span>${esc(a.name)} • ${$(a.retainer)}/mo</span><button class="b2" data-a="hist" data-id="C${a.id}">Log touch</button></div>`).join('')||'<p class="s">All clients touched recently.</p>'}</div>
  <div class="card"><div class="t">🔔 Renewals in next 60 days</div>${ren.map(a=>`<div class="row s" style="color:var(--tx);margin:6px 0"><span>${esc(a.name)}</span><b>${esc(a.renewal)}</b></div>`).join('')||'<p class="s">None. Set renewal dates with ✏️ on a client.</p>'}</div></div>
  <div class="card"><div class="t">Est. MRR by service (won deals)</div>${Object.entries(bs).sort((a,b)=>b[1]-a[1]).map(([k,v])=>bar(esc(k),$(v),1).replace(/width:[^"]*/,'width:'+Math.max(6,v/bm*100)+'%')).join('')||'<p class="s">Win a deal to see this.</p>'}</div>
