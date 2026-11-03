@@ -113,7 +113,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, insActiveOpen=false;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, insActiveOpen=false;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -350,9 +350,38 @@ function vCampaigns(){
  ${c.notes?`<p class="s" style="margin-top:6px">📝 ${esc(c.notes)}</p>`:''}
  <div class="acts"><button class="b2" data-a="hist" data-id="M${c.id}">🕒</button><button class="b2" data-a="files" data-id="M${c.id}">📎</button><button class="b2" data-a="editCamp" data-id="${c.id}">✏️</button><button class="bd" data-a="delCamp" data-id="${c.id}">🗑️</button></div></div>`
  }).join('')||'<div class="card s">No campaigns yet. Create one, then tag leads to it from the lead form so results roll up here.</div>')+pager(page,pages,'campPg')}
+/* ===== Duplicate lead detection & merge =====
+   Groups leads (within what the current user can see — same `mine` scoping
+   as everywhere else) that share a normalized company name, phone, or
+   email, via union-find so a chain of partial matches (A matches B on
+   phone, B matches C on company) still lands in one cluster together. */
+const normCompany=s=>(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const normPhone=s=>(s||'').replace(/\D+/g,'');
+const normEmail=s=>(s||'').trim().toLowerCase();
+function leadDupClusters(){
+ const leads=S.leads.filter(mine),parent={};
+ leads.forEach(l=>parent[l.id]=l.id);
+ const find=x=>parent[x]===x?x:(parent[x]=find(parent[x]));
+ const union=(a,b)=>{a=find(a);b=find(b);if(a!==b)parent[a]=b};
+ const bySig=key=>{const m=new Map();leads.forEach(l=>{const v=key(l);if(!v)return;if(!m.has(v))m.set(v,[]);m.get(v).push(l.id)});return m};
+ [bySig(l=>normCompany(l.company)),bySig(l=>normPhone(l.phone)),bySig(l=>normEmail(l.email))].forEach(m=>m.forEach(ids=>{for(let i=1;i<ids.length;i++)union(ids[0],ids[i])}));
+ const groups={};leads.forEach(l=>{const r=find(l.id);(groups[r]=groups[r]||[]).push(l)});
+ return Object.values(groups).filter(c=>c.length>1);
+}
+const dupRow=l=>`🏢 <b>${esc(l.company)}</b> — 👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')} • ✉️ ${esc(l.email||'—')} • ${esc(l.disposition)} • ${uTag(l.owner)}`;
+function renderDupModal(){
+ if(!dupClusters.length)return`<h3>🧹 Possible duplicate leads</h3><p class="s">No obvious duplicates found — checked for matching company name, phone, or email.</p><div class="acts np"><button class="b2" data-a="close">Close</button></div>`;
+ return`<h3>🧹 Possible duplicate leads</h3><p class="s" style="margin-bottom:10px">Grouped by matching company name, phone, or email. Review each group — merging moves notes, tasks, and files onto the one you keep, then deletes the rest.</p>`
+ +dupClusters.map((c,i)=>`<div class="kc" style="margin-bottom:10px">${c.map(l=>`<div class="s" style="margin:2px 0">${dupRow(l)}</div>`).join('')}<div class="acts" style="margin-top:6px"><button class="bg" data-a="reviewMerge" data-id="${i}">Review & merge</button><button class="b2" data-a="ignoreDupCluster" data-id="${i}">Not duplicates</button></div></div>`).join('')
+ +`<div class="acts np"><button class="b2" data-a="close">Close</button></div>`}
+function renderMergeReview(i){
+ const c=dupClusters[i];if(!c)return renderDupModal();
+ return`<h3>Merge ${c.length} leads</h3><p class="s" style="margin-bottom:10px">Pick the one to keep. Notes, tasks, and files from the others move onto it; the others are then deleted.</p>`
+ +c.map((l,j)=>`<label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-weight:400;text-transform:none;color:var(--tx)"><input type="radio" name="mergeKeep" value="${l.id}" ${j===0?'checked':''} style="width:auto;margin-top:3px"><span>${dupRow(l)}${(l.noteLog?.length||l.notes)?' • 📝 has notes':''}</span></label>`).join('')
+ +`<div class="acts"><button data-a="confirmMergeLeads" data-id="${i}">Merge</button><button class="b2" data-a="findDupLeads">← Back to list</button></div>`}
 function vLeads(){
  const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
- const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button data-a="newLead">+ New Lead</button></div></div>
+ const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button class="b2" data-a="findDupLeads">🧹 Duplicates</button> <button data-a="newLead">+ New Lead</button></div></div>
  <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`;
  // No search in progress and no folder open: show one folder per lead status
  // instead of every lead at once, so a long pipeline doesn't crowd the screen.
@@ -497,6 +526,29 @@ const A={
   const{items:Lp}=paginate(L,leadPage);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
   Lp.forEach(l=>allSel?selectedLeads.delete(l.id):selectedLeads.add(l.id));render()},
  clearLeadSelection(){selectedLeads.clear();render()},
+ findDupLeads(){dupClusters=leadDupClusters();openModal(renderDupModal())},
+ reviewMerge(i){openModal(renderMergeReview(+i))},
+ ignoreDupCluster(i){dupClusters=dupClusters.filter((_,idx)=>idx!==+i);openModal(renderDupModal())},
+ confirmMergeLeads(i){const c=dupClusters[+i];if(!c)return;
+  const keepId=[...document.querySelectorAll('input[name="mergeKeep"]')].find(r=>r.checked)?.value;if(!keepId)return;
+  const keep=S.leads.find(l=>l.id===keepId),losers=c.filter(l=>l.id!==keepId);
+  losers.forEach(l=>{
+   ['contact','phone','email','source','campaign'].forEach(f=>{if(!keep[f]&&l[f])keep[f]=l[f]});
+   if(!keep.value)keep.value=l.value;
+   keep.services=[...new Set([...(keep.services||[]),...(l.services||[])])];
+   const legacy=l.notes?[{id:uid(),text:'[From merged lead '+l.company+'] '+l.notes,by:'System',at:new Date().toISOString()}]:[];
+   keep.noteLog=[...(keep.noteLog||[]),...legacy,...(l.noteLog||[])];
+   // Move this duplicate's tasks/files/history onto the kept lead instead of
+   // losing them — same ref-prefix scheme the Tasks feature already uses.
+   S.tasks.forEach(k=>{if(k.ref==='L'+l.id)k.ref='L'+keep.id});
+   S.files.forEach(f=>{if(f.ref==='L'+l.id)f.ref='L'+keep.id});
+   S.log.forEach(e=>{if(e.ref==='L'+l.id)e.ref='L'+keep.id});
+   logEv('L'+keep.id,'🧹 Merged duplicate lead into this one: '+l.company)});
+  S.leads=S.leads.filter(l=>!losers.some(x=>x.id===l.id));
+  aud('Merged '+losers.length+' duplicate lead'+(losers.length===1?'':'s')+' into '+keep.company);
+  dupClusters=dupClusters.filter((_,idx)=>idx!==+i);
+  save('leads','tasks','files','log');
+  dupClusters.length?openModal(renderDupModal()):closeM()},
  bulkReassignLeads(){if(isStaff()||!selectedLeads.size)return;
   openModal(`<h3>Reassign ${selectedLeads.size} lead${selectedLeads.size===1?'':'s'}</h3><p class="s" style="margin-bottom:8px">Every selected lead will be reassigned to the owner you pick below.</p><label>New owner</label><select id="bulkOwnerSel">${owners().map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select><div class="acts np"><button data-a="confirmBulkReassign">Reassign</button><button class="b2" data-a="close">Cancel</button></div>`)},
  confirmBulkReassign(){const sel=el('bulkOwnerSel');if(!sel)return;const newOwner=sel.value,ids=[...selectedLeads],n=ids.length;
