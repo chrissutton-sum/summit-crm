@@ -48,6 +48,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
    <div id="loginErr" class="s" style="color:var(--bad);margin-bottom:9px;min-height:1em"></div>
    <button id="loginBtn" style="width:100%">Sign in</button>
   </div>
+  <p id="getAndroidApp" class="s" style="text-align:center;margin-top:12px;display:none"><a href="/download" style="color:var(--cyan)">📱 Get the Android app</a></p>
  </div>
 </div>
 <div id="app" style="display:none">
@@ -57,6 +58,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 <nav id="nav"></nav>
 <div id="modal"><div id="mbox"></div></div>
 </div>
+<script src="/native.js"></script>
 <script>
 /* ===== Data & storage: shared via db capability, falls back to localStorage ===== */
 const KEY='summit_crm_v4', uid=()=>Math.random().toString(36).slice(2,10), $=n=>'$'+Math.round(n||0).toLocaleString();
@@ -237,6 +239,7 @@ async function boot(){
  init();
  handleGoogleRedirect();
  handleDocusignRedirect();
+ Native.start();
  setInterval(()=>pullData(false),10000);
  setInterval(()=>{if(tab==='cal')syncCalendars(false)},300000);
 }

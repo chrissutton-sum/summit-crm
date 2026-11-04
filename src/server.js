@@ -300,6 +300,8 @@ app.get('/api/docusign/envelope/:id', requireAuth, async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+app.get('/download', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'download.html')));
+
 // ---- Static frontend ----
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('*', (req, res) => {
