@@ -317,6 +317,8 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  if(isStaff()){w.innerHTML=`<option value="${MYID}">${esc(ME()?.name||'Me')}</option>`;w.value=MYID;w.disabled=true;w.title="Staff can only view their own records."}
  else{w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';w.disabled=false;w.title=''}
  el('scgInsightsLink').style.display=IS_ADMIN?'inline-block':'none';
+ // Keep the reporting launch inside the Android WebView to reuse its CRM session.
+ if(window.Capacitor?.isNativePlatform?.())el('scgInsightsLink').target='_self';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
  el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
  const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
