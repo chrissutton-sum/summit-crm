@@ -28,6 +28,8 @@ async function requireAuth(req, res, next) {
   let payload;
   try {
     payload = jwt.verify(token, SECRET);
+    // Reporting sessions are read-only and cannot use normal CRM routes.
+    if (payload.scope || payload.aud) throw new Error('Restricted token');
   } catch (e) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }

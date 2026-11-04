@@ -134,6 +134,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
 });
 
 leadFinder.mount(app);
+require('./reporting').mount(app);
 
 // ---- Calendar sync: each team member can paste their calendar's private
 // iCal (.ics) feed URL (Google Calendar → Settings → "Secret address in
