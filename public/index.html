@@ -140,32 +140,56 @@ async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').
   const d=await r.json();if(!r.ok){el('loginErr').textContent=d.error||'Could not sign in.';return}
   TOKEN=d.token;MYID=d.userId;IS_ADMIN=d.isAdmin;try{localStorage.setItem('summit_token',TOKEN)}catch(e){}
   await boot()}catch(e){el('loginErr').textContent='Could not reach the server.'}}
-function save(...ks){lastLocal=Date.now();render();pushData(ks)}
+// Keys touched by a save that hasn't been confirmed written to the server
+// yet. Non-empty means there's local data the server doesn't have — pullData
+// must not overwrite S with the server's (stale) copy while this is non-empty,
+// or a save that's still in flight/retrying gets silently erased by the next
+// background poll. save() with no args (a full restore/reset) marks every key.
+let pendingKeys=new Set(), pushing=false, pushRetryTimer=null, pushFailStreak=0;
+function save(...ks){lastLocal=Date.now();(ks.length?ks:KEYS).forEach(k=>pendingKeys.add(k));render();schedulePush()}
+function schedulePush(){if(pushing)return;pushing=true;doPush()}
 // Whole-blob save: there's no per-record API, every save PUTs the entire
 // shared dataset. Left alone, that means whoever pushes LAST wins outright —
 // a tab that's been open a while (or just a slow network round trip) can
 // silently overwrite someone else's more recent edit to a totally different
 // record, not just a conflicting edit to the same one. To shrink that
 // window, re-fetch the freshest server copy immediately before writing, and
-// only overlay the section(s) this particular save actually touched (ks) —
+// only overlay the section(s) this particular save actually touched —
 // everything else rides on the just-fetched copy instead of on however
 // stale this tab's local copy happened to be.
-async function pushData(ks){try{
- try{const r=await api('/api/data');const fresh=await r.json();
-  const touched=new Set(ks&&ks.length?ks:KEYS);touched.add('audit');let picked=false;
-  // Skip overlaying "untouched" keys with the fresh copy while an edit modal
-  // is open (see pullData's comment below for why this matters): some other
-  // save happening in the background — a recurring-invoice run, another
-  // tab's edit synced in, etc. — must not replace an array that an open
-  // form's Save button is holding a direct reference into.
-  if(el('modal').style.display!=='block'){
-   KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
-  }
-  if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
- }catch(e){}
- await api('/api/data',{method:'PUT',body:JSON.stringify(S)});el('sync').textContent='● shared'
-}catch(e){if(TOKEN)el('sync').textContent='⚠ save failed'}}
-async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(Date.now()-lastLocal<4000)return;
+async function doPush(){
+ const ks=[...pendingKeys];
+ try{
+  try{const r=await api('/api/data');const fresh=await r.json();
+   const touched=new Set(ks.length?ks:KEYS);touched.add('audit');let picked=false;
+   // Skip overlaying "untouched" keys with the fresh copy while an edit modal
+   // is open (see pullData's comment below for why this matters): some other
+   // save happening in the background — a recurring-invoice run, another
+   // tab's edit synced in, etc. — must not replace an array that an open
+   // form's Save button is holding a direct reference into.
+   if(el('modal').style.display!=='block'){
+    KEYS.forEach(k=>{if(!touched.has(k)&&fresh[k]!==undefined){S[k]=fresh[k];picked=true}});
+   }
+   if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
+  }catch(e){}
+  await api('/api/data',{method:'PUT',body:JSON.stringify(S)});
+  ks.forEach(k=>pendingKeys.delete(k));
+  pushing=false;pushFailStreak=0;
+  el('sync').textContent='● shared';
+  if(pendingKeys.size)schedulePush() // more was saved while this push was in flight
+ }catch(e){
+  pushing=false;pushFailStreak++;
+  // Loud enough to notice without derailing them mid-entry: the save keeps
+  // retrying on its own, and pendingKeys (above) stops the 10s background
+  // poll from quietly erasing the unsaved edit in the meantime. If it's
+  // still failing after ~20s, say so unmissably — by then they may have
+  // already moved on to the next lead, trusting the first one was saved.
+  if(TOKEN)el('sync').innerHTML='<b style="color:#e55">⚠ not saved — retrying…</b>';
+  if(pushFailStreak===5)alert('A change hasn\'t saved yet — this device seems to have a connection problem. Keep this tab open; it will keep retrying and save as soon as the connection is back.');
+  clearTimeout(pushRetryTimer);
+  pushRetryTimer=setTimeout(schedulePush,4000);
+ }}
+async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(pendingKeys.size||Date.now()-lastLocal<4000)return;
  // Don't yank the rug out from under someone mid-type: a background sync used to
  // re-render the whole screen every 10s regardless, which wiped out any text typed
  // into a field (e.g. Settings → "+ Add user") that hadn't been saved yet. If the
