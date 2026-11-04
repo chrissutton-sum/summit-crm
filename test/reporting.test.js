@@ -59,6 +59,20 @@ test('reporting authentication, isolation, revocation, schema and failure handli
     assert.equal((await get('/normal',signToken(account))).status,200);
     assert.equal((await get('/api/reporting/users',signToken(account))).status,401);
   });
+  await t.test('CRM launch exchanges only an active administrator session', async () => {
+    const exchange = auth => get('/api/reporting/session/crm', auth, 'POST');
+    const crmToken = signToken(account);
+    const response = await exchange(crmToken);
+    assert.equal(response.status, 200);
+    assert.equal((await get('/api/reporting/users', (await response.json()).token)).status, 200);
+    assert.equal((await exchange(token)).status, 401);
+    account.is_admin = false;
+    assert.equal((await exchange(crmToken)).status, 403);
+    account.is_admin = true;
+    account.active = false;
+    assert.equal((await exchange(crmToken)).status, 403);
+    account.active = true;
+  });
   await t.test('rejects expired and tampered tokens',async()=>{
     assert.equal((await get('/api/reporting/users',token+'x')).status,401);
     const expired=jwt.sign({scope:'reports:read',accountId:1},process.env.JWT_SECRET,{audience:'scg-insights',issuer:'summit-crm',expiresIn:-1});

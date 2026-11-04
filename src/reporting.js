@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
+const { requireAuth } = require('./auth');
 
 const AUDIENCE = 'scg-insights';
 const SCOPE = 'reports:read';
@@ -75,6 +76,13 @@ function buildReport(data, now = new Date()) {
   };
 }
 
+function sendSession(res, account) {
+  const token = jwt.sign({
+    accountId: account.id, scope: SCOPE, passwordVersion: passwordVersion(account.password_hash),
+  }, process.env.JWT_SECRET, { audience: AUDIENCE, issuer: 'summit-crm', expiresIn: SESSION_SECONDS, algorithm: 'HS256' });
+  res.json({ token, expiresIn: SESSION_SECONDS, username: account.username });
+}
+
 function mount(app) {
   app.use('/api/reporting', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -103,12 +111,25 @@ function mount(app) {
         return res.status(401).json({ error: 'Sign in with an active CRM administrator account.' });
       }
       attempts.delete(key);
-      const token = jwt.sign({
-        accountId: account.id, scope: SCOPE, passwordVersion: passwordVersion(account.password_hash),
-      }, process.env.JWT_SECRET, { audience: AUDIENCE, issuer: 'summit-crm', expiresIn: SESSION_SECONDS, algorithm: 'HS256' });
-      res.json({ token, expiresIn: SESSION_SECONDS, username: account.username });
+      sendSession(res, account);
     } catch (error) {
       console.error('Reporting sign-in failed:', error.message);
+      res.status(500).json({ error: 'CRM reporting is temporarily unavailable.' });
+    }
+  });
+  app.post('/api/reporting/session/crm', requireAuth, async (req, res) => {
+    try {
+      const { rows: accounts } = await pool.query(
+        'SELECT id, username, password_hash, active, is_admin FROM accounts WHERE id = $1',
+        [req.account.accountId]
+      );
+      const account = accounts[0];
+      if (!account || !account.active || !account.is_admin) {
+        return res.status(403).json({ error: 'Reporting access requires an active CRM administrator account.' });
+      }
+      sendSession(res, account);
+    } catch (error) {
+      console.error('CRM reporting session failed:', error.message);
       res.status(500).json({ error: 'CRM reporting is temporarily unavailable.' });
     }
   });

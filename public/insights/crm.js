@@ -109,11 +109,7 @@
       $('crmRefresh').disabled = false;
     }
   }
-  // Keep the credential lifetime limited to the sign-in request.
-  $('crmLogin').onsubmit = async event => {
-    event.preventDefault();
-    const username = $('crmUsername').value.trim();
-    const password = $('crmPassword').value;
+  async function connect(path, options) {
     clearConnection();
     const version = generation;
     controller = new AbortController();
@@ -122,9 +118,7 @@
     $('crmConnect').disabled = true;
     $('crmMessage').textContent = 'Signing in to SCG CRM…';
     try {
-      const session = await request('/api/reporting/session', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}),
-      }, activeController.signal);
+      const session = await request(path, options, activeController.signal);
       if (generation !== version) return;
       if (typeof session.token !== 'string' || !session.token || !Number.isFinite(session.expiresIn)) throw Error('The CRM returned an invalid session.');
       token = session.token;
@@ -140,7 +134,27 @@
       $('crmConnect').disabled = false;
     }
     if (token && generation === version) await refresh();
+  }
+  $('crmLogin').onsubmit = event => {
+    event.preventDefault();
+    const username = $('crmUsername').value.trim();
+    const password = $('crmPassword').value;
+    return connect('/api/reporting/session', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}),
+    });
   };
+  const launchUrl = new URL(window.location.href);
+  if (launchUrl.searchParams.get('from') === 'crm') {
+    launchUrl.searchParams.delete('from');
+    history.replaceState(null, '', launchUrl);
+    let crmToken;
+    try { crmToken = localStorage.getItem('summit_token'); } catch {}
+    if (crmToken) {
+      connect('/api/reporting/session/crm', {
+        method: 'POST', headers: {Authorization: 'Bearer ' + crmToken},
+      });
+    }
+  }
   $('crmRefresh').onclick = refresh;
   $('crmDisconnect').onclick = () => disconnect('Disconnected. Sign in to load a fresh report.');
   $('crmAuto').onchange = () => {
