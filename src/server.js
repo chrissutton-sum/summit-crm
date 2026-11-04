@@ -8,6 +8,8 @@ const { signToken, requireAuth, requireAdmin } = require('./auth');
 const { fetchAndParseICS } = require('./ics');
 const google = require('./google');
 const docusign = require('./docusign');
+const leadFinder = require('./leadFinder');
+const { keepRecentTransfers } = leadFinder;
 
 const app = express();
 app.use(cors());
@@ -114,9 +116,24 @@ app.get('/api/data', requireAuth, async (req, res) => {
 app.put('/api/data', requireAuth, async (req, res) => {
   const data = req.body;
   if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Invalid payload' });
-  await pool.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT data FROM crm_data WHERE id = 1 FOR UPDATE');
+    keepRecentTransfers(rows[0]?.data, data);
+    await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Save failed', e);
+    return res.status(500).json({ error: 'Save failed' });
+  } finally {
+    client.release();
+  }
   res.json({ ok: true });
 });
+
+leadFinder.mount(app);
 
 // ---- Calendar sync: each team member can paste their calendar's private
 // iCal (.ics) feed URL (Google Calendar → Settings → "Secret address in
