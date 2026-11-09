@@ -1,10 +1,11 @@
 {
-  "name": "scg-crm-android",
+  "name": "scg-crm-mobile",
   "private": true,
   "version": "1.0.0",
-  "description": "Android shell for SCG CRM",
+  "description": "Capacitor shell for SCG CRM (Android + iOS)",
   "scripts": {
-    "sync": "cap sync android"
+    "sync:android": "cap sync android",
+    "sync:ios": "cap sync ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
