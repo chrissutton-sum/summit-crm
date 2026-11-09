@@ -70,9 +70,11 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: Install CocoaPods dependencies
-        working-directory: mobile/ios/App
-        run: pod install
+      # Capacitor 8's iOS template uses Swift Package Manager, not CocoaPods —
+      # there's no Podfile/.xcworkspace, just App.xcodeproj with a local
+      # CapApp-SPM package reference. xcodebuild resolves those packages
+      # itself on the first build (pulling ionic-team/capacitor-swift-pm from
+      # GitHub), so there's no separate install step before it.
 
       # Builds for the Simulator, which needs no signing at all — this is the
       # useful part before the Apple Developer account exists: it proves the
@@ -83,7 +85,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild \
-            -workspace App.xcworkspace -scheme App -configuration Debug \
+            -project App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             build 2>&1 | tee "$RUNNER_TEMP/xcodebuild-sim.log"
 
@@ -129,7 +131,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild \
-            -workspace App.xcworkspace -scheme App -configuration Release \
+            -project App.xcodeproj -scheme App -configuration Release \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -allowProvisioningUpdates \
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
