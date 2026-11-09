@@ -115,7 +115,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, insActiveOpen=false;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, aiConns=[], insActiveOpen=false;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -247,6 +247,8 @@ async function refreshDocusignStatus(){
 // Which S.users have a login, and whether it's currently active — admin-only
 // (the server rejects this for non-admins). Drives the Settings → Team
 // Active/Inactive badge+toggle and the "(Inactive)" suffix in owner pickers.
+// Claude / ChatGPT connections made through the AI connector (/mcp). Admins see everyone's.
+async function refreshAiConns(){try{const r=await api('/api/ai-connections');aiConns=r.ok?await r.json():[]}catch(e){}}
 async function refreshAccountsStatus(){
  if(!IS_ADMIN){accountsStatus={};return}
  try{const r=await api('/api/accounts');const d=await r.json();
@@ -260,6 +262,7 @@ async function boot(){
  await refreshGoogleStatus();
  await refreshDocusignStatus();
  await refreshAccountsStatus();
+ await refreshAiConns();
  init();
  handleGoogleRedirect();
  handleDocusignRedirect();
@@ -510,6 +513,7 @@ function vSet(){
   return`<div class="row" style="align-items:center;margin:6px 0${inactive?';opacity:.6':''}"><div><b>${uDot(u.id)}${esc(u.name)}</b> <span class="s">${esc(u.role)}</span>${u.id===MYID?' <span class="badge o">You</span>':''}${inactive?' <span class="badge r">Inactive</span>':''}</div><div><select data-c="ulevel" data-id="${u.id}" style="width:auto;margin:0"><option value="admin" ${u.level!=='staff'?'selected':''}>Admin</option><option value="staff" ${u.level==='staff'?'selected':''}>Staff</option></select> ${(IS_ADMIN||u.id===MYID)?`<button class="b2" data-a="editUser" data-id="${u.id}">✏️</button>`:''} ${IS_ADMIN?`<button class="b2" data-a="createLogin" data-id="${u.id}">+ Login</button> ${acct?(u.id===MYID?'':`<button class="b2" data-a="toggleActive" data-id="${u.id}">${inactive?'✅ Reactivate':'🚫 Deactivate'}</button>`):''} <button class="bd" data-a="delUser" data-id="${u.id}">Remove</button>`:''}</div></div>`}).join('')}${IS_ADMIN?`<input id="nu" placeholder="Name" style="margin-top:8px"><input id="nr" placeholder="Role"><button data-a="addUser">+ Add user</button>`:''}</div>
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
 </div>
+ <div class="card"><div class="t">Claude &amp; ChatGPT</div><p class="s" style="margin-top:8px">Connect the CRM to Claude or ChatGPT to look up, add and edit leads, contacts, deals and notes by chatting. Add a custom connector there with this address, then sign in with your CRM login. It can't delete anything or see invoices or settings.</p><input id="mcpUrl" readonly value="${esc(location.origin+'/mcp')}"><button data-a="copyMcpUrl">Copy address</button>${aiConns.length?aiConns.map(c=>`<div class="s" style="margin-top:10px;color:var(--tx)"><b>${esc(c.app)}</b>${IS_ADMIN?' · '+esc(uName(c.userId)):''} · ${c.lastUsedAt?'last used '+esc(fmt(c.lastUsedAt)):'connected '+esc(fmt(c.connectedAt))} <button class="bd" data-a="disconnectAi" data-id="${esc(c.id)}">Disconnect</button></div>`).join(''):'<p class="s" style="margin-top:8px">Nothing connected yet.</p>'}</div>
  <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
  <details style="margin-top:12px"><summary class="s" style="cursor:pointer">Or paste a calendar link (Outlook, Apple Calendar, etc.)</summary>
  <label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://..." value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Google Calendar also works this way if you'd rather not use the sign-in button: Settings → (pick your calendar) → "Secret address in iCal format". Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</details></div>
@@ -522,7 +526,7 @@ const owners=()=>S.users.map(u=>[u.id,u.name+(accountsStatus[u.id]&&!accountsSta
 const camps=()=>[['','— No campaign —']].concat(S.campaigns.map(c=>[c.id,c.name]));
 const CSTAT=['Planned','Active','Paused','Completed'];
 const A={
- tab(id){tab=id;render();scrollTo(0,0);if(id==='cal')syncCalendars(false)},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
+ tab(id){tab=id;render();scrollTo(0,0);if(id==='cal')syncCalendars(false);if(id==='set')refreshAiConns().then(()=>{if(tab==='set')render()})},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
  alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${uTag(a.owner)} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
  newLead(){A.editLead()},
  openLeadFolder(id){leadFolder=id;leadPage=0;render();scrollTo(0,0)},
@@ -649,6 +653,8 @@ const A={
  clearIcs(){const u=ME();if(!u)return;delete u.icsUrl;delete calFeeds[u.id];save('users');render()},
  syncCal(){syncCalendars(true)},
  async signInGoogle(){try{const r=await api('/api/google/auth-url');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start Google sign-in');location.href=d.url}catch(e){alert(e.message)}},
+ copyMcpUrl(){const i=el('mcpUrl');i.select();(navigator.clipboard?navigator.clipboard.writeText(i.value):Promise.reject()).then(()=>alert('Copied. In Claude or ChatGPT, add a custom connector and paste this address.'),()=>document.execCommand('copy'))},
+ async disconnectAi(id){if(!confirm('Disconnect this AI app? It will need to sign in again to use the CRM.'))return;try{await api('/api/ai-connections/'+encodeURIComponent(id),{method:'DELETE'});await refreshAiConns();render()}catch(e){alert('Could not disconnect.')}},
  async disconnectGoogle(){if(!confirm('Disconnect your Google Calendar?'))return;try{await api('/api/google/disconnect',{method:'POST'});delete calFeeds[MYID];await refreshGoogleStatus();render()}catch(e){alert('Could not disconnect.')}},
  async signInDocusign(){try{const r=await api('/api/docusign/auth-url');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start DocuSign sign-in');location.href=d.url}catch(e){alert(e.message)}},
  async disconnectDocusign(){if(!confirm('Disconnect the company DocuSign account? No one will be able to send proposals for signature until it\'s reconnected.'))return;try{await api('/api/docusign/disconnect',{method:'POST'});await refreshDocusignStatus();render()}catch(e){alert('Could not disconnect.')}},

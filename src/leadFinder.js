@@ -139,4 +139,4 @@ function keepRecentTransfers(current, incoming) {
   return incoming;
 }
 
-module.exports = { mount, keepRecentTransfers };
+module.exports = { mount, keepRecentTransfers, buildIndex, findMatch };

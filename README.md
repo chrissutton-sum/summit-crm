@@ -66,3 +66,27 @@ Visit your Render URL, sign in with one of the seeded logins, and you're in.
 
 Edit files directly on GitHub (or push from a local clone) — Render redeploys
 automatically from the `main` branch.
+
+## Claude & ChatGPT connector
+
+The CRM has an MCP connector at `/mcp`, so Claude or ChatGPT can look up,
+add and edit leads, contacts, deals and notes by chatting. Settings → Claude
+& ChatGPT shows the address to paste in, and who's connected.
+
+- **Sign-in:** OAuth with each person's normal CRM username/password. No API
+  keys. Only Claude and ChatGPT can receive sign-in codes
+  (`MCP_REDIRECT_HOSTS` changes that list).
+- **What it can do:** view/search/create/edit leads, contacts and deals, and
+  add notes. No deletes, nothing in invoices, settings or team logins. Same
+  rules as the app: staff logins can't reassign leads, Closed Lost needs a
+  reason, Closed Won creates the client.
+- **Cutting access:** deactivating a login, changing its password, or
+  Disconnect in Settings stops it immediately.
+- **Safe with open tabs:** records the connector changes are protected for 15
+  minutes from being overwritten by a browser tab holding an older copy
+  (`src/crmStore.js`).
+- **Optional env:** `PUBLIC_URL` if the app is served from a custom domain
+  behind another proxy (normally detected automatically).
+
+Tests: `MCP_TEST_DATABASE_URL=postgres://... node --test test/mcp.test.js`
+(wipes that database).

@@ -10,8 +10,13 @@ const google = require('./google');
 const docusign = require('./docusign');
 const leadFinder = require('./leadFinder');
 const { keepRecentTransfers } = leadFinder;
+const oauth = require('./oauth');
+const mcp = require('./mcp');
+const { keepRecentAiEdits } = require('./crmStore');
 
 const app = express();
+// Render sits behind a proxy; needed for correct client IPs and https URLs
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
@@ -121,6 +126,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     await client.query('BEGIN');
     const { rows } = await client.query('SELECT data FROM crm_data WHERE id = 1 FOR UPDATE');
     keepRecentTransfers(rows[0]?.data, data);
+    keepRecentAiEdits(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
   } catch (e) {
@@ -134,6 +140,8 @@ app.put('/api/data', requireAuth, async (req, res) => {
 });
 
 leadFinder.mount(app);
+oauth.mount(app);
+mcp.mount(app);
 require('./reporting').mount(app);
 
 // ---- Calendar sync: each team member can paste their calendar's private
@@ -312,6 +320,7 @@ app.get('*', (req, res) => {
 init()
   .then(() => google.initTable())
   .then(() => docusign.initTable())
+  .then(() => oauth.initTables())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
   })
