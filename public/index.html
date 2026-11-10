@@ -189,7 +189,11 @@ async function doPush(){
   clearTimeout(pushRetryTimer);
   pushRetryTimer=setTimeout(schedulePush,4000);
  }}
-async function pullData(quiet){try{const r=await api('/api/data');const d=await r.json();if(pendingKeys.size||Date.now()-lastLocal<4000)return;
+let lastPullText='';
+async function pullData(quiet){try{const r=await api('/api/data');const txt=await r.text();if(pendingKeys.size||Date.now()-lastLocal<4000)return;
+ // Nothing changed since the last poll — leave the screen alone.
+ if(txt===lastPullText&&!quiet)return;
+ const d=JSON.parse(txt);
  // Don't yank the rug out from under someone mid-type: a background sync used to
  // re-render the whole screen every 10s regardless, which wiped out any text typed
  // into a field (e.g. Settings → "+ Add user") that hadn't been saved yet. If the
@@ -213,7 +217,7 @@ async function pullData(quiet){try{const r=await api('/api/data');const d=await 
  // after Save or Cancel closes it.
  if(el('modal').style.display==='block')return;
  const a=document.activeElement,tag=a&&a.tagName;
- merge(d);el('sync').textContent='● shared';
+ merge(d);lastPullText=txt;el('sync').textContent='● shared';
  if(tag==='INPUT'||tag==='TEXTAREA')return;
  if(!quiet)render()}catch(e){}}
 async function refreshGoogleStatus(){
@@ -348,7 +352,18 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  if(window.Capacitor?.isNativePlatform?.())el('scgInsightsLink').target='_self';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
  el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
- const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];el('main').innerHTML=v()}
+ const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];
+ // A refresh used to rebuild the view and snap the Deals board (and any other
+ // scrolled box) back to the start every 10 seconds. Remember where each scrolled
+ // element was and put it back when the same tab re-renders.
+ const m=el('main'),sameTab=renderedTab===tab,y=scrollY,saved=sameTab?scrolledIn(m):[];
+ m.innerHTML=v();renderedTab=tab;
+ if(sameTab){saved.forEach(([key,l,t])=>{const e=findScrolled(m,key);if(e){e.scrollLeft=l;e.scrollTop=t}});if(scrollY!==y)scrollTo(scrollX,y)}}
+let renderedTab=null;
+// Scrolled elements are keyed by tag + class + position among same-keyed siblings in #main.
+function scrollKey(e){return e.tagName+'.'+(e.className||'')}
+function scrolledIn(root){const seen={},out=[];root.querySelectorAll('*').forEach(e=>{const k=scrollKey(e);seen[k]=(seen[k]||0)+1;if(e.scrollLeft||e.scrollTop)out.push([k+'#'+seen[k],e.scrollLeft,e.scrollTop])});return out}
+function findScrolled(root,key){const i=key.lastIndexOf('#'),k=key.slice(0,i),n=+key.slice(i+1);let c=0;for(const e of root.querySelectorAll('*'))if(scrollKey(e)===k&&++c===n)return e;return null}
 function vDash(){
  const D=S.deals.filter(mine),open=D.filter(isOpen),pipe=open.reduce((t,d)=>t+d.amount,0),wtd=open.reduce((t,d)=>t+d.amount*prob(d.stage)/100,0);
  const won=D.filter(d=>d.stage===WON()).reduce((t,d)=>t+d.amount,0);
