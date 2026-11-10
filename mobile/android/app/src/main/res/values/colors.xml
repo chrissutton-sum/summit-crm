@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#070B12</color>
-    <color name="colorPrimaryDark">#070B12</color>
-    <color name="colorAccent">#38BDF8</color>
-    <color name="scgBlue">#2563EB</color>
-    <color name="scgBackground">#070B12</color>
+    <color name="colorPrimary">#000B19</color>
+    <color name="colorPrimaryDark">#000B19</color>
+    <color name="colorAccent">#00E0F5</color>
+    <color name="scgBlue">#0B74B8</color>
+    <color name="scgBackground">#000B19</color>
 </resources>

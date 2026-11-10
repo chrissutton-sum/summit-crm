@@ -2,7 +2,7 @@
   "appId": "com.summitcreativegroup.crm",
   "appName": "SCG CRM",
   "webDir": "www",
-  "backgroundColor": "#070b12",
+  "backgroundColor": "#000b19",
   "server": {
     "url": "https://summit-crm-6fom.onrender.com",
     "errorPath": "index.html"

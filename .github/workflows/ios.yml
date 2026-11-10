@@ -49,8 +49,8 @@ jobs:
           npm install @capacitor/ios@^8.6.0
           npx cap add ios
           npx @capacitor/assets@latest generate --ios \
-            --iconBackgroundColor '#2563eb' --iconBackgroundColorDark '#0b1220' \
-            --splashBackgroundColor '#070b12' --splashBackgroundColorDark '#070b12'
+            --iconBackgroundColor '#0b74b8' --iconBackgroundColorDark '#02142b' \
+            --splashBackgroundColor '#000b19' --splashBackgroundColorDark '#000b19'
 
       - name: Sync web assets into the iOS project
         working-directory: mobile

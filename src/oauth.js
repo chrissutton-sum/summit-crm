@@ -125,7 +125,7 @@ function appLabel(client) {
 function page(title, body) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · SCG CRM</title><style>
-:root{--bg:#070b12;--card:#162033;--sunk:#0b101b;--ink:#f1f5f9;--muted:#94a3b8;--line:#283754;--accent:#38bdf8;--blue:#2563eb;--bad:#ef4444;color-scheme:dark}
+:root{--bg:#000b19;--card:#0a2649;--sunk:#000f22;--ink:#e8ebf0;--muted:#9ca8b8;--line:#1c3e68;--accent:#00e0f5;--blue:#0b74b8;--bad:#ef4444;color-scheme:dark}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
 .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--blue);border-radius:14px;padding:26px;display:grid;gap:14px}
 h1{font-size:21px;margin:0}p{margin:0;color:var(--muted);font-size:14px}ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
