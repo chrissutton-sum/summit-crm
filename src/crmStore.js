@@ -13,9 +13,11 @@ async function mutate(fn) {
     await client.query('BEGIN');
     const { rows } = await client.query('SELECT data FROM crm_data WHERE id = 1 FOR UPDATE');
     const data = rows[0].data;
+    const before = { deals: (data.deals || []).map(d => ({ id: d.id, stage: d.stage })) };
     const result = fn(data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
+    require('./connect').announceWins(before, data);
     return result;
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});

@@ -9,6 +9,7 @@ const { fetchAndParseICS } = require('./ics');
 const google = require('./google');
 const docusign = require('./docusign');
 const leadFinder = require('./leadFinder');
+const connect = require('./connect');
 const { keepRecentTransfers } = leadFinder;
 const oauth = require('./oauth');
 const mcp = require('./mcp');
@@ -129,6 +130,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     keepRecentAiEdits(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
+    connect.announceWins(rows[0]?.data, data);
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Save failed', e);
@@ -140,6 +142,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
 });
 
 leadFinder.mount(app);
+connect.mount(app);
 oauth.mount(app);
 mcp.mount(app);
 require('./reporting').mount(app);
