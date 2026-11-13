@@ -144,7 +144,12 @@ const STALE_DAYS = 5;
 const dispsOf = data => data.cfg?.disps || [];
 const leadConverted = data => { const d = dispsOf(data); return d.includes('Converted') ? 'Converted' : d.at(-2); };
 const leadLost = data => { const d = dispsOf(data); return d.includes('Lost') ? 'Lost' : d.at(-1); };
-const leadOpen = (data, l) => l.disposition !== leadConverted(data) && l.disposition !== leadLost(data);
+// Mirrors isLeadOpen in public/index.html, including the same "Not
+// Interested" carve-out (named directly rather than folded into the
+// Converted/Lost position fallback above) — otherwise a lead someone
+// marked dead would never get touched again and would nag its owner with
+// a stale-lead push forever.
+const leadOpen = (data, l) => l.disposition !== leadConverted(data) && l.disposition !== leadLost(data) && l.disposition !== 'Not Interested';
 const leadTouch = (data, l) => Math.max(
   l.createdAt ? +new Date(l.createdAt) : 0,
   ...(data.log || []).filter(x => x.ref === 'L' + l.id).map(x => +new Date(x.at)),

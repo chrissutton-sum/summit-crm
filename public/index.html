@@ -76,7 +76,7 @@ const DEF=()=>({users:[{id:'u1',name:'Alex',role:'Managing Partner'},{id:'u2',na
  cfg:{rates:{SEO:1200,AEO:850,GEO:850,CTV:2200,'Social Media':950,Podcasts:900,'Logo Design':750,'Live Events':2500,'SBDC: Basic Website':350,'SBDC: Logo Design':350,'SBDC: Social Media Setup':350,'SBDC: Social Media Support – Starter':500,'SBDC: Social Media Support – Growth':750,'SBDC: Social Media Support – Premium':1250},
   monthly:{'SBDC: Basic Website':false,'SBDC: Logo Design':false,'SBDC: Social Media Setup':false},
   stages:['Qualification','Audit & Discovery','Proposal / Pitch','Negotiation','Closed Won','Closed Lost'],
-  disps:['New Lead','Attempted Contact','Contacted','Discovery Scheduled','Proposal Sent','Converted','Lost'],
+  disps:['New Lead','Attempted Contact','Contacted','Discovery Scheduled','Proposal Sent','Not Interested','Converted','Lost'],
   onboard:['Signed retainer & deposit collected','Kickoff & strategy call scheduled','Website, GBP & analytics access granted','Logo & brand assets uploaded','30-day launch roadmap delivered']},
  leads:[],deals:[],acts:[],accts:[],invoices:[],recur:[],log:[],audit:[],deliv:[],props:[],tasks:[],files:[],campaigns:[],contacts:[],templates:[
  {id:'t1',name:'Intro follow-up',subject:'Great connecting, {{contact}}',body:`Hi {{contact}},
@@ -330,7 +330,11 @@ const oneTimeSum=a=>(a||[]).filter(s=>!isMonthly(s)).reduce((t,s)=>t+rate(s),0);
 const STALE_MS=5*864e5;
 const LEAD_CONVERTED=()=>S.cfg.disps.includes('Converted')?'Converted':S.cfg.disps[S.cfg.disps.length-2];
 const LEAD_LOST=()=>S.cfg.disps.includes('Lost')?'Lost':S.cfg.disps[S.cfg.disps.length-1];
-const isLeadOpen=l=>l.disposition!==LEAD_CONVERTED()&&l.disposition!==LEAD_LOST();
+// "Not Interested" is a dead end the same way "Lost" is — called out by name
+// (rather than folded into the Converted/Lost position-fallback above)
+// so it closes a lead out even for CRMs that renamed or reordered their
+// other statuses in Settings → Lists.
+const isLeadOpen=l=>l.disposition!==LEAD_CONVERTED()&&l.disposition!==LEAD_LOST()&&l.disposition!=='Not Interested';
 const leadTouch=l=>Math.max(l.createdAt?+new Date(l.createdAt):0,...S.log.filter(x=>x.ref==='L'+l.id).map(x=>+new Date(x.at)),...(l.noteLog||[]).map(n=>+new Date(n.at)));
 const isStaleLead=l=>isLeadOpen(l)&&leadTouch(l)>0&&Date.now()-leadTouch(l)>STALE_MS;
 // SLA timer: a fresh lead (still in the first/"New" disposition) should get

@@ -171,6 +171,25 @@ async function mutateData(mutator) {
   }
 }
 
+// One-time migration: make sure "Not Interested" exists as a lead status on
+// deployments from before it was added, so existing data gets the new
+// disposition's folder (folders are generated straight from cfg.disps — see
+// vLeads() in public/index.html) and closed-lead handling (isLeadOpen/
+// leadOpen) without anyone having to paste it into Settings → Lists by
+// hand. Safe to run every boot — a no-op once the status is present.
+async function ensureNotInterestedDisp() {
+  const data = await getData();
+  const disps = data.cfg?.disps;
+  if (!Array.isArray(disps) || disps.includes('Not Interested')) return;
+  await mutateData(d => {
+    const list = d.cfg?.disps;
+    if (!Array.isArray(list) || list.includes('Not Interested')) return;
+    const lostIdx = list.indexOf('Lost');
+    list.splice(lostIdx >= 0 ? lostIdx : list.length, 0, 'Not Interested');
+  });
+  console.log('[migrate] Added "Not Interested" lead status');
+}
+
 leadFinder.mount(app);
 connect.mount(app);
 oauth.mount(app);
@@ -375,6 +394,7 @@ init()
   .then(() => docusign.initTable())
   .then(() => oauth.initTables())
   .then(() => push.initTable())
+  .then(() => ensureNotInterestedDisp())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
     push.startPeriodicChecks(getData);
