@@ -346,6 +346,18 @@ const fmtDur=ms=>{const m=Math.round(Math.abs(ms)/60000),h=Math.floor(m/60),d=Ma
  if(d)return`${d}d ${h%24}h`;if(h)return`${h}h ${m%60}m`;return`${m}m`};
 const slaLabel=l=>{const dl=slaDeadline(l);if(!dl||slaMet(l))return null;
  return Date.now()>dl?`⏰ First response overdue by ${fmtDur(Date.now()-dl)}`:`⏳ First response due in ${fmtDur(dl-Date.now())}`};
+// Workflow automation: the moment a lead's status becomes "Proposal Sent",
+// make sure a follow-up task exists so it doesn't go stale waiting on a
+// reply. Idempotent (checks for an existing open auto-task first) so it's
+// safe to call from every place a disposition can change — the inline
+// dropdown's change handler and the editLead modal's save callback alike —
+// without ever double-booking a follow-up.
+const autoFollowUpOnProposal=l=>{
+ if(!l||l.disposition!=='Proposal Sent')return;
+ if(S.tasks.some(k=>k.ref==='L'+l.id&&k.auto==='proposal-followup'&&!k.done))return;
+ S.tasks.unshift({id:uid(),title:'Follow up on proposal — '+(l.company||l.contact||'lead'),owner:l.owner,due:addDays(today(),3),items:[],done:false,ref:'L'+l.id,auto:'proposal-followup'});
+ logEv('L'+l.id,'Auto follow-up task created (3 days)');
+};
 const WON=()=>S.cfg.stages[S.cfg.stages.length-2], LOST=()=>S.cfg.stages[S.cfg.stages.length-1];
 const isOpen=d=>d.stage!==WON()&&d.stage!==LOST();
 const prob=st=>{const i=S.cfg.stages.indexOf(st),n=S.cfg.stages.length;return st===WON()?100:st===LOST()?0:Math.round(10+(i/(n-2))*80)};
@@ -604,7 +616,7 @@ const A={
   form(id?'Edit Campaign':'New Campaign',[{k:'name',l:'Campaign name'},{k:'channel',l:'Channel',t:'sel',o:SOURCES},{k:'status',l:'Status',t:'sel',o:CSTAT},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'start',l:'Start date',t:'date'},{k:'end',l:'End date',t:'date'},{k:'budget',l:'Budget ($)',t:'number'},{k:'notes',l:'Notes',t:'area'}],c,o=>{if(!o.name)return alert('Campaign name required')&&false;if(id)Object.assign(c,o);else S.campaigns.unshift({id:uid(),...o});save('campaigns')})},
  delCamp(id){if(!confirm('Delete this campaign? Leads/deals tagged to it will just show no campaign.'))return;S.campaigns=S.campaigns.filter(c=>c.id!==id);S.leads.forEach(l=>{if(l.campaign===id)l.campaign=''});S.deals.forEach(d=>{if(d.campaign===id)d.campaign=''});save('campaigns','leads','deals')},
  editLead(id){const l=S.leads.find(x=>x.id===id)||{owner:isStaff()?MYID:S.users[0]?.id,disposition:S.cfg.disps[0],services:[]};
-  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'campaign',l:'Campaign',t:'sel',o:camps()},{k:'owner',l:'Owner',t:'sel',o:owners(),dis:isStaff()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;if(isStaff())o.owner=id?l.owner:MYID;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),createdAt:new Date().toISOString(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
+  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'campaign',l:'Campaign',t:'sel',o:camps()},{k:'owner',l:'Owner',t:'sel',o:owners(),dis:isStaff()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;if(isStaff())o.owner=id?l.owner:MYID;o.value=o.value||sum(o.services);if(id){Object.assign(l,o);autoFollowUpOnProposal(l)}else{const nl={id:uid(),createdAt:new Date().toISOString(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner));autoFollowUpOnProposal(nl)}save('leads','tasks')})},
  delLead(id){if(confirm('Delete lead?')){S.leads=S.leads.filter(l=>l.id!==id);S.tasks.forEach(k=>{if(k.ref==='L'+id)delete k.ref});save('leads','tasks')}},
  // Bulk lead reassignment — Admin-only, same rule as the single-lead Owner
  // lock. selectedLeads holds ids and can span multiple folders/searches at
@@ -1025,7 +1037,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&
 // Global quick search: ⌘K / Ctrl+K from anywhere in the signed-in app.
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&el('app').style.display!=='none'){e.preventDefault();A.search()}});
 document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id==='who')return render();if(!c)return;const id=t.dataset.id;
- if(c==='ldisp'){S.leads.find(l=>l.id===id).disposition=t.value;logEv('L'+id,'Status → '+t.value);save('leads')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
+ if(c==='ldisp'){const l=S.leads.find(l=>l.id===id);l.disposition=t.value;logEv('L'+id,'Status → '+t.value);autoFollowUpOnProposal(l);save('leads','tasks')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
  if(c==='lown'){if(isStaff())return render();S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
  if(c==='step')A.step(id,t)});
 document.addEventListener('input',e=>{const c=e.target.dataset.c;

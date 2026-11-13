@@ -330,7 +330,7 @@ init()
   .then(() => push.initTable())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
-    push.startTaskReminders(async () => {
+    push.startPeriodicChecks(async () => {
       const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
       return rows[0]?.data || {};
     });

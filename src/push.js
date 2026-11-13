@@ -128,20 +128,40 @@ function notifyChanges(before, after) {
   }
 }
 
-// Due/overdue task reminders happen purely because time passed, not because
-// of an edit, so they run on their own timer. Sends at most once per task
-// per calendar day; the de-dupe set is in-memory only, so a restart can
-// repeat a reminder once — harmless, and simpler than persisting it.
+// A few things happen purely because time passed rather than because of an
+// edit, so notifyChanges() (edit-triggered) can't catch them. These three
+// checks run on one shared hourly timer instead — same mirror-the-client
+// logic connect.js and the public/index.html lead helpers use (WON()/
+// LOST()/stale/SLA are each duplicated here in server-side form since
+// there's no shared module between the browser and the server).
+//
+// Sends are de-duped in-memory so a restart can repeat one reminder at
+// worst — harmless, and much simpler than persisting a "already notified"
+// flag in the data blob just for this.
 const remindedToday = new Set();
-function startTaskReminders(getData, intervalMs = 60 * 60 * 1000) {
+const SLA_HOURS = 4;
+const STALE_DAYS = 5;
+const dispsOf = data => data.cfg?.disps || [];
+const leadConverted = data => { const d = dispsOf(data); return d.includes('Converted') ? 'Converted' : d.at(-2); };
+const leadLost = data => { const d = dispsOf(data); return d.includes('Lost') ? 'Lost' : d.at(-1); };
+const leadOpen = (data, l) => l.disposition !== leadConverted(data) && l.disposition !== leadLost(data);
+const leadTouch = (data, l) => Math.max(
+  l.createdAt ? +new Date(l.createdAt) : 0,
+  ...(data.log || []).filter(x => x.ref === 'L' + l.id).map(x => +new Date(x.at)),
+  ...(l.noteLog || []).map(n => +new Date(n.at)),
+);
+
+function startPeriodicChecks(getData, intervalMs = 60 * 60 * 1000) {
   const check = async () => {
     try {
       const data = await getData();
       const dateKey = new Date().toISOString().slice(0, 10);
+
+      // 1. Tasks due/overdue today — once per task per calendar day.
       const due = (data.tasks || []).filter(t => !t.done && t.due && t.due <= dateKey);
       const byOwner = new Map();
       for (const t of due) {
-        const key = dateKey + ':' + t.id;
+        const key = 'task:' + dateKey + ':' + t.id;
         if (remindedToday.has(key)) continue;
         remindedToday.add(key);
         if (!byOwner.has(t.owner)) byOwner.set(t.owner, []);
@@ -152,12 +172,41 @@ function startTaskReminders(getData, intervalMs = 60 * 60 * 1000) {
         const overdue = tasks.filter(t => t.due < dateKey).length;
         sendToUsers([owner], '✅ Tasks due today', `${tasks.length} task${tasks.length === 1 ? '' : 's'} due${overdue ? ` (${overdue} overdue)` : ''}`, { type: 'tasks' });
       }
-      if (remindedToday.size > 5000) remindedToday.clear(); // don't grow forever
+
+      // 2. SLA breach — a lead still in the first ("New") disposition that's
+      // gone past SLA_HOURS with no first response. Fires once per lead
+      // (not daily); re-arms automatically if the lead ever cycles back
+      // through "New" again later (new createdAt-independent breach).
+      const firstDisp = dispsOf(data)[0];
+      for (const l of data.leads || []) {
+        if (!l.createdAt || l.disposition !== firstDisp) continue;
+        const deadline = +new Date(l.createdAt) + SLA_HOURS * 3600e3;
+        if (Date.now() <= deadline) continue;
+        const key = 'sla:' + l.id + ':' + l.createdAt;
+        if (remindedToday.has(key)) continue;
+        remindedToday.add(key);
+        sendToUsers([l.owner], '⏰ SLA breached', `${l.company || l.contact || 'A lead'} has had no first response in ${SLA_HOURS}h+`, { type: 'lead', id: l.id });
+      }
+
+      // 3. Stale lead — gone quiet (no logged activity) for STALE_DAYS+ while
+      // still open. Keyed to the day of last activity, so a lead that gets
+      // touched and later goes stale again triggers a fresh notification.
+      for (const l of data.leads || []) {
+        if (!leadOpen(data, l)) continue;
+        const touch = leadTouch(data, l);
+        if (!touch || Date.now() - touch <= STALE_DAYS * 864e5) continue;
+        const key = 'stale:' + l.id + ':' + Math.floor(touch / 864e5);
+        if (remindedToday.has(key)) continue;
+        remindedToday.add(key);
+        sendToUsers([l.owner], '🧊 Lead gone quiet', `${l.company || l.contact || 'A lead'} — no activity in ${STALE_DAYS}+ days`, { type: 'lead', id: l.id });
+      }
+
+      if (remindedToday.size > 10000) remindedToday.clear(); // don't grow forever
     } catch (e) {
-      console.error('[push] task reminder check failed:', e.message);
+      console.error('[push] periodic check failed:', e.message);
     }
   };
   setInterval(check, intervalMs);
 }
 
-module.exports = { mount, initTable, notifyChanges, sendToUsers, startTaskReminders };
+module.exports = { mount, initTable, notifyChanges, sendToUsers, startPeriodicChecks };
