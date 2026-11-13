@@ -151,7 +151,11 @@ function signInPage(client, params, error = '') {
       <label>Username<input name="username" autocomplete="username" required autofocus></label>
       <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
       ${error ? `<div class="err">${esc(error)}</div>` : ''}
-      <div class="row"><button type="submit" name="action" value="deny">Cancel</button><button class="go" type="submit" name="action" value="allow">Allow</button></div>
+      <!-- Allow comes first in the markup on purpose: pressing Enter in the
+           password box (or a password manager auto-submitting) uses the first
+           submit button in the form, and that used to be Cancel. row-reverse
+           keeps Cancel on the left visually. -->
+      <div class="row" style="flex-direction:row-reverse"><button class="go" type="submit" name="action" value="allow">Allow</button><button type="submit" name="action" value="deny" formnovalidate>Cancel</button></div>
     </form>`);
 }
 
