@@ -120,7 +120,7 @@ Here is your monthly snapshot for {{client}}:
 
 {{rep}}
 Summit Creative Group`}]});
-let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, aiConns=[], insActiveOpen=false;
+let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, aiConns=[], insActiveOpen=false, staleLeadsOnly=false;
 const PAGESZ=10;
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
@@ -319,6 +319,20 @@ const isMonthly=s=>{const m=S.cfg.monthly||{};return m[s]!==undefined?!!m[s]:(ON
 // (e.g. an SBDC Special setup fee) shouldn't inflate a lead/deal's MRR.
 const sum=a=>(a||[]).filter(isMonthly).reduce((t,s)=>t+rate(s),0);
 const oneTimeSum=a=>(a||[]).filter(s=>!isMonthly(s)).reduce((t,s)=>t+rate(s),0);
+// A lead counts as "stale" once it's gone STALE_MS with no logged activity —
+// a note, a history check-in, or an edit — and is still in an open (not
+// Converted/Lost) status. leadTouch() mirrors the Insights "at risk" client
+// logic (see touch() below): it reads S.log entries filed against the lead
+// (from the 🕒 history modal) plus the lead's own inline noteLog, so most
+// activity already recorded elsewhere counts without any new bookkeeping.
+// Leads with no timestamp signal at all (created before this existed, never
+// touched) are left unflagged rather than guessed at.
+const STALE_MS=5*864e5;
+const LEAD_CONVERTED=()=>S.cfg.disps.includes('Converted')?'Converted':S.cfg.disps[S.cfg.disps.length-2];
+const LEAD_LOST=()=>S.cfg.disps.includes('Lost')?'Lost':S.cfg.disps[S.cfg.disps.length-1];
+const isLeadOpen=l=>l.disposition!==LEAD_CONVERTED()&&l.disposition!==LEAD_LOST();
+const leadTouch=l=>Math.max(l.createdAt?+new Date(l.createdAt):0,...S.log.filter(x=>x.ref==='L'+l.id).map(x=>+new Date(x.at)),...(l.noteLog||[]).map(n=>+new Date(n.at)));
+const isStaleLead=l=>isLeadOpen(l)&&leadTouch(l)>0&&Date.now()-leadTouch(l)>STALE_MS;
 const WON=()=>S.cfg.stages[S.cfg.stages.length-2], LOST=()=>S.cfg.stages[S.cfg.stages.length-1];
 const isOpen=d=>d.stage!==WON()&&d.stage!==LOST();
 const prob=st=>{const i=S.cfg.stages.indexOf(st),n=S.cfg.stages.length;return st===WON()?100:st===LOST()?0:Math.round(10+(i/(n-2))*80)};
@@ -382,8 +396,9 @@ function vDash(){
  const cnt={};[...S.leads.filter(mine),...D].forEach(x=>(x.services||[]).forEach(s=>cnt[s]=(cnt[s]||0)+1));const cm=Math.max(1,...Object.values(cnt));
  const uv=S.users.map(u=>({u,v:S.deals.filter(d=>d.owner===u.id&&isOpen(d)).reduce((t,d)=>t+d.amount,0)})),um=Math.max(1,...uv.map(x=>x.v));
  const unpaid=S.invoices.filter(i=>!i.paid).reduce((t,i)=>t+i.amount,0);
+ const staleLeads=S.leads.filter(l=>mine(l)&&isStaleLead(l)).length;
  return`<div class="row" style="margin-bottom:12px"><h2>Executive Command</h2><div><button data-a="newLead">+ Lead</button> <button class="bg" data-a="prop" data-id="blank">📄 Blank Quote</button></div></div>
- <div class="kpis"><div class="kpi">Open Pipeline<b>${$(pipe)}</b></div><div class="kpi">Weighted<b>${$(wtd)}</b></div><div class="kpi">Won<b style="color:var(--ok)">${$(won)}</b></div><div class="kpi">Open Tasks<b style="color:var(--gold)">${taskCount}${od?` <small style="color:#f87171">(${od} overdue)</small>`:''}</b></div></div>
+ <div class="kpis"><div class="kpi">Open Pipeline<b>${$(pipe)}</b></div><div class="kpi">Weighted<b>${$(wtd)}</b></div><div class="kpi">Won<b style="color:var(--ok)">${$(won)}</b></div><div class="kpi">Open Tasks<b style="color:var(--gold)">${taskCount}${od?` <small style="color:#f87171">(${od} overdue)</small>`:''}</b></div><div class="kpi" data-a="showStaleLeads" style="cursor:pointer" title="Leads with no activity in ${STALE_MS/864e5}+ days">Stale Leads<b style="color:${staleLeads?'#f87171':'var(--ok)'}">${staleLeads}</b></div></div>
  <div class="g2"><div class="card"><div class="t">Pipeline by Stage</div>${S.cfg.stages.map(s=>{const l=D.filter(d=>d.stage===s);return bar(`${esc(s)} (${l.length})`,$(l.reduce((t,d)=>t+d.amount,0)),1,s===WON()?'g':s===LOST()?'y':'').replace(/width:[^"]*/,`width:${Math.max(l.length?6:0,l.reduce((t,d)=>t+d.amount,0)/stMax*100)}%`)}).join('')}</div>
  <div class="card"><div class="t">Service Demand</div>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([s,c])=>bar(esc(s),c,cm)).join('')||'<p class="s">Tag services on leads or deals.</p>'}</div></div>
  <div class="card"><div class="t">Team Leaderboard</div>${uv.map(x=>bar(`${uDot(x.u.id)}${esc(x.u.name)} <span class="s">${esc(x.u.role)}</span>`,$(x.v),1,'y').replace(/width:[^"]*/,`width:${Math.max(x.v?5:0,x.v/um*100)}%`)).join('')}<div class="s">Unpaid invoices: <b style="color:var(--gold)">${$(unpaid)}</b></div></div>`}
@@ -434,28 +449,29 @@ function renderMergeReview(i){
  +`<div class="acts"><button data-a="confirmMergeLeads" data-id="${i}">Merge</button><button class="b2" data-a="findDupLeads">← Back to list</button></div>`}
 function vLeads(){
  const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
- const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button class="b2" data-a="findDupLeads">🧹 Duplicates</button> <button data-a="newLead">+ New Lead</button></div></div>
+ const staleCount=mineLeads.filter(isStaleLead).length;
+ const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button class="b2" data-a="findDupLeads">🧹 Duplicates</button>${staleCount?` <button class="b2" style="color:#f87171" data-a="showStaleLeads">⚠ ${staleCount} stale</button>`:''} <button data-a="newLead">+ New Lead</button></div></div>
  <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`;
  // No search in progress and no folder open: show one folder per lead status
  // instead of every lead at once, so a long pipeline doesn't crowd the screen.
- if(!q&&!leadFolder){
+ if(!q&&!leadFolder&&!staleLeadsOnly){
   const buckets=S.cfg.disps.slice();
   const extra=[...new Set(mineLeads.map(l=>l.disposition).filter(d=>!buckets.includes(d)))];
-  return head+`<div class="folders">`+buckets.concat(extra).map(st=>{const n=mineLeads.filter(l=>l.disposition===st).length;
-   return`<div class="card folder" data-a="openLeadFolder" data-id="${esc(st)}"><div class="t">📁 ${esc(st)}</div><div class="s">${n} lead${n===1?'':'s'}</div></div>`}).join('')+`</div>`
+  return head+`<div class="folders">`+buckets.concat(extra).map(st=>{const n=mineLeads.filter(l=>l.disposition===st).length,sn=mineLeads.filter(l=>l.disposition===st&&isStaleLead(l)).length;
+   return`<div class="card folder" data-a="openLeadFolder" data-id="${esc(st)}"><div class="t">📁 ${esc(st)}</div><div class="s">${n} lead${n===1?'':'s'}${sn?` • <span style="color:#f87171">⚠ ${sn} stale</span>`:''}</div></div>`}).join('')+`</div>`
    +(mineLeads.length?'':'<div class="card s" style="margin-top:12px">No leads yet.</div>')}
- const L=mineLeads.filter(l=>q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
+ const L=mineLeads.filter(l=>staleLeadsOnly?isStaleLead(l):q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
  const backBtn=!q?`<button class="b2" data-a="leadFolderBack">← All folders</button>`:'';
  const{items:Lp,page,pages}=paginate(L,leadPage);leadPage=page;
  // Bulk reassignment is Admin-only, same rule as changing a single lead's
  // owner — Staff can select nothing here since the checkboxes don't render.
  const canBulk=!isStaff(),allSelOnPage=canBulk&&Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
- return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`:''}</div>${Lp.length?`<div><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
+ return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?(staleLeadsOnly?`<span class="t" style="align-self:center;color:#f87171">⚠ Stale leads (no activity in ${STALE_MS/864e5}+ days)</span>`:`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`):''}</div>${Lp.length?`<div><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
  +(canBulk&&Lp.length?`<div class="row" style="margin:-4px 0 10px;flex-wrap:wrap;gap:8px;align-items:center"><button class="b2" data-a="selectAllLeads">${allSelOnPage?'☑ Deselect all on this page':'☐ Select all on this page'}</button>${selectedLeads.size?`<span class="s">${selectedLeads.size} selected</span><button class="bg" data-a="bulkReassignLeads">👤 Reassign owner</button><button class="b2" data-a="clearLeadSelection">Clear</button>`:''}</div>`:'')
  +(Lp.map(l=>{const open=openLeads.has(l.id);
  const noteCount=l.noteLog?.length||0;
  const leadTasks=S.tasks.filter(k=>k.ref==='L'+l.id),openTaskCount=leadTasks.filter(k=>!k.done).length;
- return`<div class="card"><div class="row" data-a="toggleLead" data-id="${l.id}" style="cursor:pointer;align-items:center">${canBulk?`<input type="checkbox" data-a="toggleLeadSelect" data-id="${l.id}" ${selectedLeads.has(l.id)?'checked':''} style="width:auto;margin:0 10px 0 0" title="Select for bulk owner reassignment">`:''}<div style="flex:1"><div class="t">${open?'▾':'▸'} ${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')} • ${esc(l.disposition)}${canBulk?' • '+uTag(l.owner):''}${noteCount?` • 📝 ${noteCount}`:''}${openTaskCount?` • ✅ ${openTaskCount}`:''}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
+ return`<div class="card"><div class="row" data-a="toggleLead" data-id="${l.id}" style="cursor:pointer;align-items:center">${canBulk?`<input type="checkbox" data-a="toggleLeadSelect" data-id="${l.id}" ${selectedLeads.has(l.id)?'checked':''} style="width:auto;margin:0 10px 0 0" title="Select for bulk owner reassignment">`:''}<div style="flex:1"><div class="t">${open?'▾':'▸'} ${esc(l.company)}</div><div class="s">👤 ${esc(l.contact||'—')} • 📞 ${esc(l.phone||'—')} • ${esc(l.disposition)}${canBulk?' • '+uTag(l.owner):''}${noteCount?` • 📝 ${noteCount}`:''}${openTaskCount?` • ✅ ${openTaskCount}`:''}${isStaleLead(l)?` • <span style="color:#f87171">⚠ stale ${Math.floor((Date.now()-leadTouch(l))/864e5)}d</span>`:''}</div></div><span class="badge">${$(l.value||sum(l.services))}/mo</span></div>
  ${open?`<div class="row" style="margin-top:8px"><div style="flex:1"><label>Status</label><select data-c="ldisp" data-id="${l.id}">${optL(S.cfg.disps,l.disposition)}</select></div><div style="flex:1"><label>Owner${isStaff()?' (Admins only)':''}</label><select data-c="lown" data-id="${l.id}" ${isStaff()?'disabled title="Only Admins can change a lead\'s owner."':''}>${optU(l.owner)}</select></div></div>
  ${l.campaign?`<p class="s" style="margin-top:4px">📣 ${esc(nameOf(l.campaign))}</p>`:''}<div>${l.services.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
  <div style="margin-top:10px"><div class="t" style="font-size:.84rem;margin-bottom:6px">📝 Notes${noteCount?` (${noteCount})`:''}</div>
@@ -553,8 +569,9 @@ const A={
  tab(id){tab=id;render();scrollTo(0,0);if(id==='cal')syncCalendars(false);if(id==='set')refreshAiConns().then(()=>{if(tab==='set')render()})},close:closeM,mode(){dealMode=dealMode==='kan'?'list':'kan';render()},
  alerts(){openModal(`<h3>🔔 Due & overdue</h3>`+(S.acts.filter(dueNow).map(a=>`<p class="s" style="margin:8px 0;color:var(--tx)"><span class="badge ${a.pri==='High'?'r':''}">${esc(a.pri)}</span> <b>${esc(a.title)}</b> (${esc(a.client)})<br>${uTag(a.owner)} • ${esc(a.dt.replace('T',' '))}</p>`).join('')||'<p class="s">Nothing due.</p>')+`<button class="b2" data-a="close">Close</button>`)},
  newLead(){A.editLead()},
- openLeadFolder(id){leadFolder=id;leadPage=0;render();scrollTo(0,0)},
- leadFolderBack(){leadFolder=null;leadPage=0;render();scrollTo(0,0)},
+ openLeadFolder(id){leadFolder=id;staleLeadsOnly=false;leadPage=0;render();scrollTo(0,0)},
+ leadFolderBack(){leadFolder=null;staleLeadsOnly=false;leadPage=0;render();scrollTo(0,0)},
+ showStaleLeads(){leadFolder=null;window._lq='';staleLeadsOnly=true;tab='leads';leadPage=0;render();scrollTo(0,0)},
  leadPg(dir){leadPage+=+dir;render();scrollTo(0,0)},
  clientPg(dir){clientPage+=+dir;render();scrollTo(0,0)},
  campPg(dir){campPage+=+dir;render();scrollTo(0,0)},
@@ -565,14 +582,14 @@ const A={
  delContact(id){if(confirm('Delete this contact?')){S.contacts=S.contacts.filter(k=>k.id!==id);save('contacts')}},
  emailContact(id){const k=S.contacts.find(x=>x.id===id);emailOpen({ref:'K'+id,client:k.company||k.name,contact:k.name||'there',email:k.email,rep:uName(k.owner),tpl:'Intro follow-up'})},
  convertContact(id){const k=S.contacts.find(x=>x.id===id);if(!k||k.convertedLeadId)return;
-  const nl={id:uid(),company:k.company||k.name,contact:k.name,phone:k.phone||'',email:k.email||'',source:'Unknown',disposition:S.cfg.disps[0],value:0,services:[],notes:k.notes||'',owner:k.owner};
+  const nl={id:uid(),createdAt:new Date().toISOString(),company:k.company||k.name,contact:k.name,phone:k.phone||'',email:k.email||'',source:'Unknown',disposition:S.cfg.disps[0],value:0,services:[],notes:k.notes||'',owner:k.owner};
   S.leads.unshift(nl);k.convertedLeadId=nl.id;logEv('K'+id,'🚀 Converted to lead: '+nl.company);slackNotify('🎯 New lead from contact: *'+nl.company+'* — owner '+uName(nl.owner));save('contacts','leads','log');tab='leads';render()},
  newCamp(){A.editCamp()},
  editCamp(id){const c=S.campaigns.find(x=>x.id===id)||{owner:S.users[0]?.id,status:'Planned',channel:SOURCES[0]};
   form(id?'Edit Campaign':'New Campaign',[{k:'name',l:'Campaign name'},{k:'channel',l:'Channel',t:'sel',o:SOURCES},{k:'status',l:'Status',t:'sel',o:CSTAT},{k:'owner',l:'Owner',t:'sel',o:owners()},{k:'start',l:'Start date',t:'date'},{k:'end',l:'End date',t:'date'},{k:'budget',l:'Budget ($)',t:'number'},{k:'notes',l:'Notes',t:'area'}],c,o=>{if(!o.name)return alert('Campaign name required')&&false;if(id)Object.assign(c,o);else S.campaigns.unshift({id:uid(),...o});save('campaigns')})},
  delCamp(id){if(!confirm('Delete this campaign? Leads/deals tagged to it will just show no campaign.'))return;S.campaigns=S.campaigns.filter(c=>c.id!==id);S.leads.forEach(l=>{if(l.campaign===id)l.campaign=''});S.deals.forEach(d=>{if(d.campaign===id)d.campaign=''});save('campaigns','leads','deals')},
  editLead(id){const l=S.leads.find(x=>x.id===id)||{owner:isStaff()?MYID:S.users[0]?.id,disposition:S.cfg.disps[0],services:[]};
-  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'campaign',l:'Campaign',t:'sel',o:camps()},{k:'owner',l:'Owner',t:'sel',o:owners(),dis:isStaff()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;if(isStaff())o.owner=id?l.owner:MYID;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
+  form(id?'Edit Lead':'New Lead',[{k:'company',l:'Company'},{k:'contact',l:'Contact'},{k:'phone',l:'Phone',t:'tel'},{k:'email',l:'Email',t:'email'},{k:'source',l:'Lead source',t:'sel',o:SOURCES},{k:'campaign',l:'Campaign',t:'sel',o:camps()},{k:'owner',l:'Owner',t:'sel',o:owners(),dis:isStaff()},{k:'disposition',l:'Status',t:'sel',o:S.cfg.disps},{k:'value',l:'Monthly value (0 = auto from services)',t:'number'},{k:'services',l:'Services',t:'srv'},{k:'notes',l:'Notes',t:'area'}],l,o=>{if(!o.company)return alert('Company required')&&false;if(isStaff())o.owner=id?l.owner:MYID;o.value=o.value||sum(o.services);if(id)Object.assign(l,o);else{const nl={id:uid(),createdAt:new Date().toISOString(),...o};S.leads.unshift(nl);slackNotify('🎯 New lead: *'+nl.company+'* ('+nl.disposition+') — owner '+uName(nl.owner))}save('leads')})},
  delLead(id){if(confirm('Delete lead?')){S.leads=S.leads.filter(l=>l.id!==id);S.tasks.forEach(k=>{if(k.ref==='L'+id)delete k.ref});save('leads','tasks')}},
  // Bulk lead reassignment — Admin-only, same rule as the single-lead Owner
  // lock. selectedLeads holds ids and can span multiple folders/searches at
@@ -918,7 +935,7 @@ Object.assign(A,{
   R.forEach(r=>{let o,ex;
    if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
     ex=S.leads.find(l=>(o.email&&low(l.email)===low(o.email))||(low(l.company)===low(o.company)&&low(l.contact)===low(o.contact)));
-    if(!ex||mode==='add'){S.leads.unshift({id:uid(),imp:batch,...o});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
+    if(!ex||mode==='add'){S.leads.unshift({id:uid(),imp:batch,createdAt:new Date().toISOString(),...o});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
    if(type==='deals'){const nm=get(r,'name')||get(r,'account');if(!nm){skip++;return}const sv=svc(r),st=get(r,'stage'),ls=low(st);const stage=S.cfg.stages.find(x=>low(x)===ls)||(/won/.test(ls)?WON():/lost/.test(ls)?LOST():S.cfg.stages[0]);
     o={name:nm,account:get(r,'account')||nm,email:get(r,'email'),stage,amount:num(get(r,'amount'))||sum(sv),close:dt(get(r,'close')),source:src(r),services:sv,owner:owner(r)};
     ex=S.deals.find(d=>low(d.name)===low(o.name)&&low(d.account)===low(o.account));
@@ -972,7 +989,7 @@ f.page_url.value=location.href;['utm_source','utm_medium','utm_campaign'].forEac
     if(ex){logEv('L'+ex.id,'🌐 Submitted the web form again'+(msg?': '+msg:''));dup++;return}
     const sv=SRV.filter(x=>low(svs).includes(low(x))),x=low(us),source=/google|bing|seo|organic/.test(x)?'Google / SEO':/facebook|instagram|linkedin|tiktok|twitter|social/.test(x)?'Social':/partner/.test(x)?'Partner':/referral/.test(x)?'Referral':'Website';
     const owner=mode==='rr'?S.users[(S.leads.length+n++)%S.users.length].id:mode,notes=[msg,page&&'Page: '+page,(us||um||uc)&&'UTM: '+[us,um,uc].filter(Boolean).join(' / ')].filter(Boolean).join(' • ');
-    const id=uid(),co=company||name||email;S.leads.unshift({id,imp:batch,company:co,contact:name,phone:gv(o,['phone','phonenumber','tel','telephone','mobile']),email,source,disposition:S.cfg.disps[0],value:sum(sv),services:sv,notes,owner});
+    const id=uid(),co=company||name||email;S.leads.unshift({id,imp:batch,createdAt:new Date().toISOString(),company:co,contact:name,phone:gv(o,['phone','phonenumber','tel','telephone','mobile']),email,source,disposition:S.cfg.disps[0],value:sum(sv),services:sv,notes,owner});
     logEv('L'+id,'🌐 Website form submission'+(msg?': '+msg:''));
     if(fu){const d=new Date(Date.now()+36e5);S.acts.unshift({id:uid(),imp:batch,type:'Follow-Up',title:'Respond to web lead: '+co,client:co,owner,dt:new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16),pri:'High',done:false})}add++});
    if(add)S.cfg.lastImport={id:batch,type:'leads',count:add,at:new Date().toISOString()};aud('Web submissions: '+add+' leads, '+dup+' repeat, '+skip+' skipped');save('leads','acts','cfg');closeM();alert(add+' new lead(s) created'+(dup?', '+dup+' repeat submitter(s) logged on existing leads':'')+(skip?', '+skip+' skipped':'')+'.')}}
