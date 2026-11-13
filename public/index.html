@@ -580,7 +580,7 @@ function vSet(){
  <div class="card"><div class="t">Your login</div><label>Current password</label><input id="pwOld" type="password" autocomplete="current-password"><label>New password (min 8 characters)</label><input id="pwNew" type="password" autocomplete="new-password"><div id="pwErr" class="s" style="color:var(--bad);min-height:1em"></div><button data-a="changePw">Change password</button>
 </div>
 ${aiCard()}
- <div class="card"><div class="t">Your calendar</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google Calendar as ${esc(googleStatus.connected[MYID])}</p><button class="bd" data-a="disconnectGoogle">Disconnect Google Calendar</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
+ <div class="card"><div class="t">Your calendar &amp; Gmail</div>${googleStatus.connected[MYID]?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected to Google as ${esc(googleStatus.connected[MYID])} — your schedule syncs automatically, and the ✉️ Email button on any lead or contact can now send through your real Gmail (with replies logged back automatically) instead of just opening a mailto link.</p><button class="bd" data-a="disconnectGoogle">Disconnect Google</button>`:googleStatus.configured?`<p class="s" style="margin-top:8px">Sign in once and your schedule shows up on the Shared Calendar automatically — no copying links, stays up to date on its own. It also lets you send email straight from a lead or contact's record through your real Gmail, with replies logged back automatically.</p><button data-a="signInGoogle">🔵 Sign in with Google</button>`:`<p class="s" style="margin-top:8px">Google sign-in isn't set up for this CRM yet — ask Chris to add the Google OAuth credentials. In the meantime you can paste a calendar link below.</p>`}
  <details style="margin-top:12px"><summary class="s" style="cursor:pointer">Or paste a calendar link (Outlook, Apple Calendar, etc.)</summary>
  <label style="margin-top:8px">Calendar feed URL (iCal / .ics)</label><input id="icsUrl" placeholder="https://..." value="${esc(ME()?.icsUrl||'')}"><p class="s" style="margin-top:4px">Outlook/Office 365: Calendar → Share → "Publish a calendar" → ICS link. Apple Calendar: right-click the calendar → Share → Public Calendar. Google Calendar also works this way if you'd rather not use the sign-in button: Settings → (pick your calendar) → "Secret address in iCal format". Paste that link here — it's kept private to SCG CRM and only used to read your schedule, never to write to it.</p><button class="b2" data-a="saveIcs">Save calendar link</button>${ME()?.icsUrl?` <button class="bd" data-a="clearIcs">Remove</button>`:''}</details></div>
  <div class="card"><div class="t">E-signature (DocuSign)</div>${docusignStatus.connected?`<p class="s" style="margin-top:8px;color:var(--ok)">✅ Connected as ${esc(docusignStatus.email)} — every "Send for Signature" goes out through this account.</p>${IS_ADMIN?`<button class="bd" data-a="disconnectDocusign">Disconnect DocuSign</button>`:`<p class="s">Ask Chris to disconnect or reconnect this.</p>`}`:docusignStatus.configured?(IS_ADMIN?`<p class="s" style="margin-top:8px">Connect one company DocuSign account. Once connected, anyone on the team can send a proposal for signature straight from the Quote screen.</p><button data-a="signInDocusign">✍️ Connect DocuSign</button>`:`<p class="s" style="margin-top:8px">Not connected yet — ask Chris to connect the company DocuSign account here.</p>`):`<p class="s" style="margin-top:8px">DocuSign isn't set up for this CRM yet — ask Chris to add the DocuSign API credentials.</p>`}</div>
@@ -795,12 +795,33 @@ function runRecurring(){let ch=false;const t=today();
 function portalText(a){const inv=S.invoices.filter(i=>i.client===a.name),acts=S.acts.filter(x=>x.client===a.name&&!x.done),d=a.steps.filter(s=>s.done).length;
  return'Onboarding: '+d+'/'+a.steps.length+' steps complete'+NL+a.steps.map(s=>(s.done?'[x] ':'[ ] ')+s.text).join(NL)+NL+NL+'Invoices:'+NL+(inv.map(i=>'INV-'+i.num+' '+$(i.amount)+' – '+(i.paid?'PAID':'due '+(i.due||'—'))).join(NL)||'none')+NL+NL+'Upcoming:'+NL+(acts.map(x=>x.dt.replace('T',' ')+' – '+x.title).join(NL)||'nothing scheduled')}
 function emailOpen(c){const T=S.templates;if(!T.length)return alert('Add a template in Settings first.');
- openModal(`<h3>✉️ Email</h3><label>Template</label><select id="et">${T.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('')}</select><label>To</label><input id="eto" value="${esc(c.email||'')}"><label>Subject</label><input id="esu"><label>Body</label><textarea id="eb" rows="10"></textarea><div class="acts np"><button id="emo">📧 Open in mail</button><button class="b2" id="ecp">📋 Copy</button><button class="b2" data-a="close">Close</button></div>`);
+ // Two-way email logging: when the signed-in user has Gmail connected (see
+ // Settings → Your calendar), offer to actually send through it instead of
+ // just opening a mailto link — that way the CRM knows for a fact it went
+ // out (vs. "maybe", since a mailto click can be abandoned) and can log
+ // replies back onto the same record automatically (google.js's
+ // syncGmailReplies, polling every 5 minutes server-side).
+ const gmailReady=!!(googleStatus.connected&&googleStatus.connected[MYID]);
+ openModal(`<h3>✉️ Email</h3><label>Template</label><select id="et">${T.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('')}</select><label>To</label><input id="eto" value="${esc(c.email||'')}"><label>Subject</label><input id="esu"><label>Body</label><textarea id="eb" rows="10"></textarea><div class="acts np">${gmailReady?'<button id="egm">📨 Send via Gmail</button>':''}<button ${gmailReady?'class="b2"':''} id="emo">📧 Open in mail</button><button class="b2" id="ecp">📋 Copy</button><button class="b2" data-a="close">Close</button></div>`);
  const mg=x=>String(x).replace(/\{\{(\w+)\}\}/g,(m,k)=>c[k]??(k==='extra'?'':m));
  const fill=()=>{const t=T[el('et').value];el('esu').value=mg(t.subject);el('eb').value=mg(t.body)};
  const i=T.findIndex(t=>t.name===c.tpl);if(i>=0)el('et').value=i;el('et').onchange=fill;fill();
  el('emo').onclick=()=>{if(c.ref){logEv(c.ref,'Emailed: '+el('esu').value);save('log')}location.href='mailto:'+el('eto').value+'?subject='+encodeURIComponent(el('esu').value)+'&body='+encodeURIComponent(el('eb').value)};
- el('ecp').onclick=()=>navigator.clipboard.writeText(el('esu').value+NL+NL+el('eb').value).then(()=>alert('Copied'),()=>alert('Copy blocked'))}
+ el('ecp').onclick=()=>navigator.clipboard.writeText(el('esu').value+NL+NL+el('eb').value).then(()=>alert('Copied'),()=>alert('Copy blocked'));
+ if(gmailReady)el('egm').onclick=async()=>{
+  const to=el('eto').value.trim();if(!to)return alert('Enter a To address first.');
+  const subject=el('esu').value,body=el('eb').value,btn=el('egm');btn.disabled=true;btn.textContent='Sending…';
+  try{
+   const r=await api('/api/gmail/send',{method:'POST',body:JSON.stringify({to,subject,body})});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||'Send failed');
+   if(c.ref){
+    logEv(c.ref,'✉️ Sent via Gmail: '+subject);
+    if(c.ref[0]==='L'){const l=S.leads.find(x=>x.id===c.ref.slice(1));if(l){l.gmailThreadId=d.threadId;l.gmailSeenIds=[...new Set([...(l.gmailSeenIds||[]),d.id])]}}
+    save('leads','log')
+   }
+   closeM();alert('Sent via Gmail.')
+  }catch(e){alert(e.message||'Could not send.');btn.disabled=false;btn.textContent='📨 Send via Gmail'}
+ }}
 Object.assign(A,{
  editTpl(id){const t=S.templates.find(x=>x.id===id)||{};form(id?'Edit Template':'New Template',[{k:'name',l:'Name'},{k:'subject',l:'Subject'},{k:'body',l:'Body',t:'area'}],t,o=>{if(!o.name)return alert('Name required')&&false;if(id)Object.assign(t,o);else S.templates.push({id:uid(),...o});save('templates')})},
  delTpl(id){if(confirm('Delete template?')){S.templates=S.templates.filter(t=>t.id!==id);save('templates')}},

@@ -7,7 +7,16 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('./db');
 const { utcMsToBizLocal } = require('./ics');
 
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'];
+const SCOPES = [
+  'openid', 'email',
+  'https://www.googleapis.com/auth/calendar.readonly',
+  // Lets someone send an email from a lead/contact record as themselves
+  // (see sendEmail below) and lets the server read just enough of the
+  // resulting thread to log replies back onto that record (see
+  // syncGmailReplies) — never anyone's whole inbox.
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.readonly',
+];
 
 function configured() {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI);
@@ -167,4 +176,103 @@ async function fetchEvents(userId, windowStartMs, windowEndMs) {
   return events;
 }
 
-module.exports = { configured, initTable, buildAuthUrl, verifyState, connect, disconnect, statusAll, fetchEvents };
+// ---- Two-way email logging ----
+// Outbound: sendEmail actually sends through the signed-in user's own Gmail
+// (not a mailto link), so the CRM can be sure it went out and log it as a
+// fact rather than a maybe. Inbound: syncGmailReplies polls each lead's
+// stored thread for messages since the last check and logs any that didn't
+// come from the owner themself — so a reply shows up on the lead's activity
+// history without anyone copy-pasting it in.
+
+function buildRawMessage({ to, subject, body, fromEmail }) {
+  const lines = [
+    `To: ${to}`,
+    fromEmail ? `From: ${fromEmail}` : null,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    body || '',
+  ].filter(line => line !== null);
+  return Buffer.from(lines.join('\r\n')).toString('base64url');
+}
+
+async function sendEmail(userId, { to, subject, body }) {
+  const accessToken = await getFreshAccessToken(userId);
+  if (!accessToken) throw new Error('Not connected to Google — sign in under Settings → Your calendar first.');
+  const { rows } = await pool.query('SELECT email FROM google_tokens WHERE user_id = $1', [userId]);
+  const raw = buildRawMessage({ to, subject, body, fromEmail: rows[0]?.email });
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error && data.error.message) || 'Gmail send failed');
+  return { id: data.id, threadId: data.threadId };
+}
+
+async function fetchThreadMessages(userId, threadId) {
+  const accessToken = await getFreshAccessToken(userId);
+  if (!accessToken) return null;
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+    { headers: { Authorization: 'Bearer ' + accessToken } },
+  );
+  const data = await res.json();
+  if (!res.ok) return null;
+  return (data.messages || []).map(m => ({
+    id: m.id,
+    internalDate: +m.internalDate || Date.now(),
+    from: (m.payload?.headers || []).find(h => h.name === 'From')?.value || '',
+    snippet: m.snippet || '',
+  }));
+}
+
+// getData() reads the current CRM blob (for scanning which leads have a
+// gmailThreadId and who owns them). mutateData(fn) runs fn against a
+// FOR-UPDATE-locked copy of that same blob and writes back whatever fn
+// mutated in place — see server.js's mutateData, which guards this the same
+// way PUT /api/data guards a normal save. notify(userIds, title, body, data)
+// is push.sendToUsers, passed in rather than required directly so this
+// module doesn't need to know push.js exists.
+async function syncGmailReplies(getData, mutateData, notify) {
+  const data = await getData();
+  const leads = (data.leads || []).filter(l => l.gmailThreadId);
+  if (!leads.length) return;
+  const { rows: tokRows } = await pool.query('SELECT user_id, email FROM google_tokens');
+  const emailByUser = new Map(tokRows.map(r => [r.user_id, r.email]));
+
+  for (const lead of leads) {
+    const myEmail = emailByUser.get(lead.owner);
+    if (!myEmail) continue; // owner isn't (or no longer) connected to Google
+    let msgs;
+    try { msgs = await fetchThreadMessages(lead.owner, lead.gmailThreadId); } catch (e) { continue; }
+    if (!msgs) continue;
+
+    const seen = new Set(lead.gmailSeenIds || []);
+    const fresh = msgs.filter(m => !seen.has(m.id));
+    if (!fresh.length) continue;
+    const incoming = fresh.filter(m => !m.from.toLowerCase().includes(myEmail.toLowerCase()));
+
+    await mutateData(d => {
+      const l2 = (d.leads || []).find(x => x.id === lead.id);
+      if (!l2) return;
+      l2.gmailSeenIds = [...new Set([...(l2.gmailSeenIds || []), ...fresh.map(m => m.id)])];
+      for (const m of incoming) {
+        d.log = d.log || [];
+        d.log.unshift({ id: 'gm_' + m.id, ref: 'L' + l2.id, text: `↩️ Reply from ${m.from}: ${m.snippet}`, by: 'Gmail sync', at: new Date(m.internalDate).toISOString() });
+      }
+      if (d.log && d.log.length > 600) d.log = d.log.slice(0, 600);
+    });
+
+    if (incoming.length) {
+      notify([lead.owner], '📧 New email reply', `${lead.company || lead.contact || 'A lead'} replied to your email`, { type: 'lead', id: lead.id });
+    }
+  }
+}
+
+module.exports = {
+  configured, initTable, buildAuthUrl, verifyState, connect, disconnect, statusAll, fetchEvents,
+  sendEmail, syncGmailReplies,
+};

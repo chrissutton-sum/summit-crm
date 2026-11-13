@@ -143,6 +143,34 @@ app.put('/api/data', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Read-only snapshot of the blob, for background jobs that only need to look
+// (push.js's periodic checks, google.js's Gmail-reply scan).
+async function getData() {
+  const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
+  return rows[0]?.data || {};
+}
+
+// Same FOR-UPDATE read-modify-write pattern as PUT /api/data above, for
+// background jobs that need to write (currently just google.js logging a
+// Gmail reply onto a lead). mutator gets the locked blob to edit in place;
+// its return value is ignored — whatever it mutated is what gets saved.
+async function mutateData(mutator) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT data FROM crm_data WHERE id = 1 FOR UPDATE');
+    const data = rows[0]?.data || {};
+    await mutator(data);
+    await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Background data update failed', e);
+  } finally {
+    client.release();
+  }
+}
+
 leadFinder.mount(app);
 connect.mount(app);
 oauth.mount(app);
@@ -243,6 +271,25 @@ app.get('/api/google/status-all', requireAuth, async (req, res) => {
   res.json({ configured: google.configured(), connected: await google.statusAll() });
 });
 
+// Two-way email logging: actually sends through the signed-in user's own
+// Gmail (reusing the same Google connection as the calendar sign-in above,
+// now also scoped for gmail.send/readonly) rather than just opening a
+// mailto link, so the client can log it as sent rather than "maybe sent".
+// The client itself writes the S.log entry and the lead's gmailThreadId via
+// the normal PUT /api/data save right after this succeeds — this endpoint
+// only talks to Gmail, it doesn't touch crm_data.
+app.post('/api/gmail/send', requireAuth, async (req, res) => {
+  if (!google.configured()) return res.status(501).json({ error: 'Google sign-in is not set up yet' });
+  const { to, subject, body } = req.body || {};
+  if (!to || !subject) return res.status(400).json({ error: 'to and subject required' });
+  try {
+    const result = await google.sendEmail(req.account.userId, { to, subject, body: body || '' });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: (e && e.message) || 'Send failed' });
+  }
+});
+
 const gcalCache = new Map(); // userId -> { at, events, error }
 app.get('/api/calendar-feed/google', requireAuth, async (req, res) => {
   const ownerId = String(req.query.ownerId || '');
@@ -330,10 +377,15 @@ init()
   .then(() => push.initTable())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
-    push.startPeriodicChecks(async () => {
-      const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
-      return rows[0]?.data || {};
-    });
+    push.startPeriodicChecks(getData);
+    // Separate, more frequent timer for Gmail reply logging — a reply
+    // sitting unlogged for up to an hour (push.js's cadence) would make the
+    // "two-way" part feel broken, so this checks every 5 minutes instead.
+    // No-ops instantly whenever Google sign-in isn't configured at all.
+    setInterval(() => {
+      if (!google.configured()) return;
+      google.syncGmailReplies(getData, mutateData, push.sendToUsers).catch(e => console.error('[gmail sync] failed:', e.message));
+    }, 5 * 60 * 1000);
   })
   .catch((e) => {
     console.error('Failed to initialize database', e);
