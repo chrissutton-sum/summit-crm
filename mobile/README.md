@@ -48,3 +48,9 @@ The archive/export/upload steps are written against Apple's current (as of
 this writing) automatic-signing + API-key flow, but untested — nothing in
 this sandbox can run Xcode to verify it. Treat the first real run after the
 secrets are added as a debugging pass, not a guaranteed success.
+
+## Push notifications
+
+The code for this is already deployed and currently inert. See
+[`PUSH_SETUP.md`](./PUSH_SETUP.md) for the one Firebase setup step needed to
+turn it on.

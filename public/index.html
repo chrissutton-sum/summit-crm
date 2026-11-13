@@ -138,7 +138,7 @@ const api=async(path,opts={})=>{const r=await fetch(path,{...opts,headers:{'Cont
  if(r.status===401){doLogout();throw new Error('Session expired')}
  if(r.status===403&&path==='/api/data'){doLogout();alert('This login has been deactivated. Ask an admin to reactivate it.');throw new Error('Account deactivated')}
  return r};
-function doLogout(){TOKEN=null;try{localStorage.removeItem('summit_token')}catch(e){}el('app').style.display='none';el('loginScreen').style.display='flex';el('loginPass').value=''}
+function doLogout(){Native.unregisterPush();TOKEN=null;try{localStorage.removeItem('summit_token')}catch(e){}el('app').style.display='none';el('loginScreen').style.display='flex';el('loginPass').value=''}
 async function doLogin(){const u=el('loginUser').value.trim(),p=el('loginPass').value;el('loginErr').textContent='';
  if(!u||!p){el('loginErr').textContent='Enter a username and password.';return}
  try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});

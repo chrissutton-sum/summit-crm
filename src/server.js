@@ -13,6 +13,7 @@ const connect = require('./connect');
 const { keepRecentTransfers } = leadFinder;
 const oauth = require('./oauth');
 const mcp = require('./mcp');
+const push = require('./push');
 const { keepRecentAiEdits } = require('./crmStore');
 
 const app = express();
@@ -131,6 +132,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
     connect.announceWins(rows[0]?.data, data);
+    push.notifyChanges(rows[0]?.data, data);
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Save failed', e);
@@ -145,6 +147,7 @@ leadFinder.mount(app);
 connect.mount(app);
 oauth.mount(app);
 mcp.mount(app);
+push.mount(app);
 require('./reporting').mount(app);
 
 // ---- Calendar sync: each team member can paste their calendar's private
@@ -324,8 +327,13 @@ init()
   .then(() => google.initTable())
   .then(() => docusign.initTable())
   .then(() => oauth.initTables())
+  .then(() => push.initTable())
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
+    push.startTaskReminders(async () => {
+      const { rows } = await pool.query('SELECT data FROM crm_data WHERE id = 1');
+      return rows[0]?.data || {};
+    });
   })
   .catch((e) => {
     console.error('Failed to initialize database', e);
