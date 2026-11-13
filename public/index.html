@@ -58,7 +58,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 </div>
 <div id="app" style="display:none">
 <header><div class="hb"><img class="logo" src="/logo.png" alt="SCG"><h1>SCG CRM<small>Summit Creative Group • Boise, ID</small></h1></div>
-<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a id="scgInsightsLink" class="btn b2" href="/insights/?from=crm" target="_blank" rel="noopener" style="display:none">SCG Insights</a><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" data-a="search">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a id="scgInsightsLink" class="btn b2" href="/insights/?from=crm" target="_blank" rel="noopener" style="display:none">SCG Insights</a><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" data-a="search" title="Search everything (⌘K / Ctrl+K)">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
 <div class="wrap" id="main"></div>
 <nav id="nav"></nav>
 <div id="modal"><div id="mbox"></div></div>
@@ -877,9 +877,20 @@ Object.assign(A,{
   window._fr=ref;if(AS)el('fup').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await AS.upload(f);S.files.push({id:uid(),ref,name:f.name,url:r.url,aid:r.id});logEv(ref,'📎 Attached '+f.name);save('files');A.files(ref)}catch(x){alert('Upload failed: '+(x.message||x.code||x))}}},
  addLink(ref){const n=el('fln').value.trim(),u=el('flu').value.trim();if(!n||!/^https?:\/\//i.test(u))return alert('Enter a name and a full http(s) link.');S.files.push({id:uid(),ref,name:n,url:u});logEv(ref,'🔗 Linked '+n);save('files');A.files(ref)},
  async delFile(id){const f=S.files.find(x=>x.id===id);if(!f||!confirm('Remove '+f.name+'?'))return;if(f.aid&&AS)try{await AS.delete(f.aid)}catch(e){}S.files=S.files.filter(x=>x.id!==id);save('files');A.files(window._fr)},
- goto(t){closeM();A.tab(t)},
- search(){openModal(`<input id="sq" placeholder="Search leads, deals, campaigns, clients, invoices, tasks…" style="margin-bottom:10px"><div id="sr"></div>`);const sq=el('sq');sq.focus();sq.oninput=()=>{const q=sq.value.toLowerCase().trim();if(q.length<2){el('sr').innerHTML='';return}const R=[];const add=(tab,ic,label,sub)=>{if(!hidden(tab)&&(label+' '+sub).toLowerCase().includes(q))R.push(`<button class="b2" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-a="goto" data-id="${tab}">${ic} <b>${esc(label)}</b> <span class="s">${esc(sub)}</span></button>`)};
-   S.leads.forEach(l=>add('leads','🎯',l.company,l.contact+' '+l.email+' '+l.services.join(' ')+' '+l.notes));S.deals.forEach(d=>add('deals','💼',d.name,d.account+' '+d.stage));S.campaigns.forEach(c=>add('camp','📣',c.name,c.channel+' '+c.status));S.accts.forEach(a=>add('clients','🚀',a.name,a.contact));S.invoices.forEach(i=>add('inv','🧾','INV-'+i.num,i.client+' '+i.desc));S.tasks.forEach(k=>add('tasks','✅',k.title,''));S.acts.forEach(a=>add('cal','📅',a.title,a.client));S.deliv.forEach(d=>add('tasks','📦',d.title,nameOf('C'+d.acct)));
+ // Jumps from a quick-search result straight to that specific record —
+ // not just its tab — by setting the same view-local search/open-set state
+ // each tab's own card-expand or search box already reads (gotoClient()
+ // below does the same thing for the Insights "Active clients" list).
+ goto(t,btn){const rid=btn?.dataset.rid;closeM();
+  if(t==='leads'&&rid){window._lq='';leadFolder=null;staleLeadsOnly=false;openLeads.add(rid);leadPage=0}
+  else if(t==='deals'&&rid){const d=S.deals.find(x=>x.id===rid);if(d){window._dq=d.name;openDeals.add(rid)}}
+  else if(t==='camp'&&rid){const c=S.campaigns.find(x=>x.id===rid);if(c)window._cq=c.name}
+  else if(t==='clients'&&rid){const a=S.accts.find(x=>x.id===rid);if(a){window._clq=a.name;openAccts.add(rid);clientPage=0}}
+  else if(t==='inv'&&rid){const inv=S.invoices.find(x=>String(x.num)===rid);if(inv)window._iq='INV-'+inv.num}
+  else if(t==='tasks'&&rid){const k=S.tasks.find(x=>x.id===rid)||S.deliv.find(x=>x.id===rid);if(k)window._tq=k.title}
+  A.tab(t)},
+ search(){openModal(`<input id="sq" placeholder="Search leads, deals, campaigns, clients, invoices, tasks… (⌘K)" style="margin-bottom:10px"><div id="sr"></div>`);const sq=el('sq');sq.focus();sq.oninput=()=>{const q=sq.value.toLowerCase().trim();if(q.length<2){el('sr').innerHTML='';return}const R=[];const add=(tab,ic,label,sub,rid)=>{if(!hidden(tab)&&(label+' '+sub).toLowerCase().includes(q))R.push(`<button class="b2" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-a="goto" data-id="${tab}" data-rid="${esc(String(rid??''))}">${ic} <b>${esc(label)}</b> <span class="s">${esc(sub)}</span></button>`)};
+   S.leads.forEach(l=>add('leads','🎯',l.company,l.contact+' '+l.email+' '+l.services.join(' ')+' '+l.notes,l.id));S.deals.forEach(d=>add('deals','💼',d.name,d.account+' '+d.stage,d.id));S.campaigns.forEach(c=>add('camp','📣',c.name,c.channel+' '+c.status,c.id));S.accts.forEach(a=>add('clients','🚀',a.name,a.contact,a.id));S.invoices.forEach(i=>add('inv','🧾','INV-'+i.num,i.client+' '+i.desc,i.num));S.tasks.forEach(k=>add('tasks','✅',k.title,'',k.id));S.acts.forEach(a=>add('cal','📅',a.title,a.client,a.id));S.deliv.forEach(d=>add('tasks','📦',d.title,nameOf('C'+d.acct),d.id));
    el('sr').innerHTML=R.slice(0,25).join('')||'<p class="s">No matches.</p>'}}
 });
 
@@ -996,6 +1007,8 @@ f.page_url.value=location.href;['utm_source','utm_medium','utm_campaign'].forEac
 });
 /* ===== Event delegation ===== */
 document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a]){auditClick(t);A[t.dataset.a](t.dataset.id,t)}else if(e.target===el('modal'))closeM()});
+// Global quick search: ⌘K / Ctrl+K from anywhere in the signed-in app.
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&el('app').style.display!=='none'){e.preventDefault();A.search()}});
 document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id==='who')return render();if(!c)return;const id=t.dataset.id;
  if(c==='ldisp'){S.leads.find(l=>l.id===id).disposition=t.value;logEv('L'+id,'Status → '+t.value);save('leads')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
  if(c==='lown'){if(isStaff())return render();S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
