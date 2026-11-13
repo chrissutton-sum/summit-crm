@@ -72,7 +72,10 @@ const safe = fn => (req, res, next) => fn(req, res, next).catch(e => {
   console.error('oauth', e);
   if (!res.headersSent) res.status(500).json({ error: 'server_error' });
 });
-const oauthError = (res, status, error, description) => res.status(status).json({ error, error_description: description });
+const oauthError = (res, status, error, description) => {
+  console.log(`[connector] refused: ${error} (${description})`);
+  return res.status(status).json({ error, error_description: description });
+};
 
 // Simple per-IP lockout for the sign-in page
 const failures = new Map();
@@ -169,6 +172,18 @@ function redirectWith(res, uri, params) {
 }
 
 function mount(app) {
+  // One line per connector request (sign-in, token, /mcp) so a failed
+  // "connect to Claude/ChatGPT" attempt can be traced to the step it
+  // stopped at. Never logs passwords, codes or tokens.
+  app.use((req, res, next) => {
+    if (!/^\/(oauth\/|mcp$|\.well-known\/)/.test(req.path)) return next();
+    res.on('finish', () => {
+      const rpc = req.path === '/mcp' && req.body && req.body.method ? ` rpc=${req.body.method}` : '';
+      console.log(`[connector] ${req.method} ${req.path} -> ${res.statusCode}${rpc} ua="${String(req.get('user-agent') || '').slice(0, 70)}"`);
+    });
+    next();
+  });
+
   app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'], (req, res) => {
     res.json({
       resource: resourceUrl(req),
@@ -198,6 +213,7 @@ function mount(app) {
   app.post('/oauth/register', safe(async (req, res) => {
     const b = req.body || {};
     const uris = Array.isArray(b.redirect_uris) ? b.redirect_uris.map(String) : [];
+    console.log(`[connector] register "${String(b.client_name || '').slice(0, 60)}" redirect_uris=${JSON.stringify(uris)} auth=${b.token_endpoint_auth_method || 'none'}`);
     if (!uris.length || !uris.every(redirectAllowed)) {
       return oauthError(res, 400, 'invalid_redirect_uri', 'Only Claude and ChatGPT can connect to this CRM.');
     }
@@ -221,6 +237,7 @@ function mount(app) {
 
   app.get('/oauth/authorize', safe(async (req, res) => {
     const { client, error } = await checkAuthorizeParams(req.query);
+    if (error) console.log(`[connector] sign-in page refused: ${error} redirect_uri=${String(req.query.redirect_uri || '').slice(0, 120)}`);
     if (error) return res.status(400).send(page('Can’t connect', `<h1>Can’t connect</h1><p>${esc(error)}</p>`));
     res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https:; frame-ancestors 'none'");
     res.send(signInPage(client, req.query));
@@ -229,13 +246,17 @@ function mount(app) {
   app.post('/oauth/authorize', express.urlencoded({ extended: false }), safe(async (req, res) => {
     const p = req.body || {};
     const { client, error } = await checkAuthorizeParams(p);
+    const who = String(p.username || '').toLowerCase().trim().slice(0, 40);
+    if (error) console.log(`[connector] sign-in refused: ${error}`);
     if (error) return res.status(400).send(page('Can’t connect', `<h1>Can’t connect</h1><p>${esc(error)}</p>`));
     res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https:; frame-ancestors 'none'");
+    if (p.action !== 'allow') console.log('[connector] sign-in cancelled by user');
     if (p.action !== 'allow') return redirectWith(res, p.redirect_uri, { error: 'access_denied', state: p.state });
 
     if (lockedOut(req.ip)) return res.status(429).send(signInPage(client, p, 'Too many attempts. Try again in 15 minutes.'));
     const { rows: [account] } = await pool.query('SELECT * FROM accounts WHERE username = $1', [String(p.username || '').toLowerCase().trim()]);
     const ok = account && await bcrypt.compare(String(p.password || ''), account.password_hash);
+    if (!ok) console.log(`[connector] sign-in failed for "${who}": ${account ? 'wrong password' : 'no such login'}`);
     if (!ok) { recordFailure(req.ip); return res.status(401).send(signInPage(client, p, 'Username or password is incorrect.')); }
     if (account.active === false) return res.status(403).send(signInPage(client, p, 'This login has been deactivated.'));
 
@@ -243,6 +264,7 @@ function mount(app) {
     await pool.query(`INSERT INTO oauth_codes (code_hash, client_id, account_id, redirect_uri, challenge, expires_at)
                       VALUES ($1, $2, $3, $4, $5, now() + make_interval(secs => $6))`,
       [sha(code), client.client_id, account.id, p.redirect_uri, p.code_challenge, CODE_TTL]);
+    console.log(`[connector] sign-in ok for "${who}", returning to ${new URL(p.redirect_uri).origin}${new URL(p.redirect_uri).pathname}`);
     redirectWith(res, p.redirect_uri, { code, state: p.state });
   }));
 
