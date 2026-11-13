@@ -44,10 +44,12 @@ jobs:
       # skips the google-services plugin entirely when it's missing, so the
       # build stays green either way — this just enables push when it's there.
       - name: Add Firebase config for push notifications (if provided)
-        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > mobile/android/app/google-services.json
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > mobile/android/app/google-services.json
+          fi
 
       - name: Load signing key
         env:
