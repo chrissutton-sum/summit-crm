@@ -142,4 +142,6 @@ $('export').onclick = () => {
   link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+// Already inside the Android app? No need to offer the download.
+$('getAndroidApp').hidden = !!window.Capacitor?.isNativePlatform?.();
 sampleData();
