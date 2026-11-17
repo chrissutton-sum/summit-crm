@@ -483,7 +483,9 @@ function renderMergeReview(i){
 function vLeads(){
  const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
  const staleCount=mineLeads.filter(isStaleLead).length,slaCount=mineLeads.filter(slaOverdue).length;
- const head=`<div class="row" style="margin-bottom:10px"><h2>Leads</h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button class="b2" data-a="findDupLeads">🧹 Duplicates</button>${staleCount?` <button class="b2" style="color:#f87171" data-a="showStaleLeads">⚠ ${staleCount} stale</button>`:''}${slaCount?` <button class="b2" style="color:#f87171" data-a="showSlaBreaches">⏰ ${slaCount} SLA overdue</button>`:''} <button data-a="newLead">+ New Lead</button></div></div>
+ // Total follows the "All users" picker in the header, same as the folders below.
+ const who=el('who').value,totalTitle=who==='ALL'?'All leads':'Leads owned by '+uName(who);
+ const head=`<div class="row" style="margin-bottom:10px"><h2 style="display:flex;align-items:center;gap:10px">Leads <span class="badge" style="font-size:.85rem" title="${esc(totalTitle)}">${mineLeads.length.toLocaleString()}</span></h2><div><button class="b2" data-a="csv" data-id="leads">⬇ CSV</button> <button class="b2" data-a="findDupLeads">🧹 Duplicates</button>${staleCount?` <button class="b2" style="color:#f87171" data-a="showStaleLeads">⚠ ${staleCount} stale</button>`:''}${slaCount?` <button class="b2" style="color:#f87171" data-a="showSlaBreaches">⏰ ${slaCount} SLA overdue</button>`:''} <button data-a="newLead">+ New Lead</button></div></div>
  <input placeholder="Search…" value="${esc(window._lq||'')}" data-c="lq">`;
  // No search in progress and no folder open: show one folder per lead status
  // instead of every lead at once, so a long pipeline doesn't crowd the screen.
@@ -494,12 +496,12 @@ function vLeads(){
    return`<div class="card folder" data-a="openLeadFolder" data-id="${esc(st)}"><div class="t">📁 ${esc(st)}</div><div class="s">${n} lead${n===1?'':'s'}${sn?` • <span style="color:#f87171">⚠ ${sn} stale</span>`:''}</div></div>`}).join('')+`</div>`
    +(mineLeads.length?'':'<div class="card s" style="margin-top:12px">No leads yet.</div>')}
  const L=mineLeads.filter(l=>leadFilter==='stale'?isStaleLead(l):leadFilter==='sla'?slaOverdue(l):q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
- const backBtn=!q?`<button class="b2" data-a="leadFolderBack">← All folders</button>`:'';
+ const backBtn=!q?`<button class="b2" data-a="leadFolderBack">← All folders</button>`:`<span class="s" style="align-self:center">${L.length.toLocaleString()} match${L.length===1?'':'es'}</span>`;
  const{items:Lp,page,pages}=paginate(L,leadPage,leadPageSz);leadPage=page;
  // Bulk reassignment is Admin-only, same rule as changing a single lead's
  // owner — Staff can select nothing here since the checkboxes don't render.
  const canBulk=!isStaff(),allSelOnPage=canBulk&&Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
- const filterLabel=leadFilter==='stale'?`<span class="t" style="align-self:center;color:#f87171">⚠ Stale leads (no activity in ${STALE_MS/864e5}+ days)</span>`:leadFilter==='sla'?`<span class="t" style="align-self:center;color:#f87171">⏰ SLA overdue (no first response within ${SLA_HOURS}h)</span>`:`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`;
+ const filterLabel=leadFilter==='stale'?`<span class="t" style="align-self:center;color:#f87171">⚠ Stale leads (no activity in ${STALE_MS/864e5}+ days)</span>`:leadFilter==='sla'?`<span class="t" style="align-self:center;color:#f87171">⏰ SLA overdue (no first response within ${SLA_HOURS}h)</span>`:`<span class="t" style="align-self:center">📁 ${esc(leadFolder)} <span class="s">(${L.length.toLocaleString()})</span></span>`;
  return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?filterLabel:''}</div>${Lp.length?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><label class="s" style="display:flex;gap:6px;align-items:center;margin:0;text-transform:none">Show<select data-c="lpsz" style="width:auto;margin:0;padding:4px 8px">${LEAD_PAGE_SIZES.map(n=>`<option ${n===leadPageSz?'selected':''}>${n}</option>`).join('')}</select>per page</label><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
  +(canBulk&&Lp.length?`<div class="row" style="margin:-4px 0 10px;flex-wrap:wrap;gap:8px;align-items:center"><button class="b2" data-a="selectAllLeads">${allSelOnPage?'☑ Deselect all on this page':'☐ Select all on this page'}</button>${selectedLeads.size?`<span class="s">${selectedLeads.size} selected</span><button class="bg" data-a="bulkReassignLeads">👤 Reassign owner</button><button class="b2" data-a="clearLeadSelection">Clear</button>`:''}</div>`:'')
  +(Lp.map(l=>{const open=openLeads.has(l.id);
