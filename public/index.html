@@ -122,11 +122,15 @@ Here is your monthly snapshot for {{client}}:
 Summit Creative Group`}]});
 let S=DEF(), tab='dash', dl=null, dealMode='kan', dragId=null, lastLocal=0, leadFolder=null, leadPage=0, clientPage=0, campPage=0, contactPage=0, openAccts=new Set(), openLeads=new Set(), openDeals=new Set(), selectedLeads=new Set(), dupClusters=[], calFeeds={}, calSyncAt=0, calSyncing=false, googleStatus={configured:false,connected:{}}, docusignStatus={configured:false,connected:false}, accountsStatus={}, aiConns=[], insActiveOpen=false, leadFilter=null;
 const PAGESZ=10;
+// Leads per page is the viewer's own choice (remembered in this browser only),
+// so "Select all on this page" can grab up to 100 at once for bulk reassignment.
+const LEAD_PAGE_SIZES=[10,20,30,40,50,100];
+let leadPageSz=(()=>{try{const n=+localStorage.getItem('scgLeadPageSz');return LEAD_PAGE_SIZES.includes(n)?n:PAGESZ}catch(e){return PAGESZ}})();
 // Slices items into one page of PAGESZ, clamping the current page in place, and
 // returns {items, page, pages} so the caller can render a page of cards plus
 // Previous/Next controls at the bottom. setPage lets Next/Previous mutate the
 // right state var (leadPage or clientPage) without duplicating this logic.
-function paginate(items,page){const pages=Math.max(1,Math.ceil(items.length/PAGESZ));if(page>=pages)page=pages-1;if(page<0)page=0;return{items:items.slice(page*PAGESZ,page*PAGESZ+PAGESZ),page,pages}}
+function paginate(items,page,sz=PAGESZ){const pages=Math.max(1,Math.ceil(items.length/sz));if(page>=pages)page=pages-1;if(page<0)page=0;return{items:items.slice(page*sz,page*sz+sz),page,pages}}
 function pager(page,pages,action){return pages<=1?'':`<div class="row" style="justify-content:center;gap:12px;margin:14px 0 4px"><button class="b2" ${page<=0?'disabled':''} data-a="${action}" data-id="-1">◀ Previous</button><span class="s" style="align-self:center">Page ${page+1} of ${pages}</span><button class="b2" ${page>=pages-1?'disabled':''} data-a="${action}" data-id="1">Next ▶</button></div>`}
 const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files','campaigns','contacts'];
 const el=id=>document.getElementById(id);
@@ -491,12 +495,12 @@ function vLeads(){
    +(mineLeads.length?'':'<div class="card s" style="margin-top:12px">No leads yet.</div>')}
  const L=mineLeads.filter(l=>leadFilter==='stale'?isStaleLead(l):leadFilter==='sla'?slaOverdue(l):q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
  const backBtn=!q?`<button class="b2" data-a="leadFolderBack">← All folders</button>`:'';
- const{items:Lp,page,pages}=paginate(L,leadPage);leadPage=page;
+ const{items:Lp,page,pages}=paginate(L,leadPage,leadPageSz);leadPage=page;
  // Bulk reassignment is Admin-only, same rule as changing a single lead's
  // owner — Staff can select nothing here since the checkboxes don't render.
  const canBulk=!isStaff(),allSelOnPage=canBulk&&Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
  const filterLabel=leadFilter==='stale'?`<span class="t" style="align-self:center;color:#f87171">⚠ Stale leads (no activity in ${STALE_MS/864e5}+ days)</span>`:leadFilter==='sla'?`<span class="t" style="align-self:center;color:#f87171">⏰ SLA overdue (no first response within ${SLA_HOURS}h)</span>`:`<span class="t" style="align-self:center">📁 ${esc(leadFolder)}</span>`;
- return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?filterLabel:''}</div>${Lp.length?`<div><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
+ return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?filterLabel:''}</div>${Lp.length?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><label class="s" style="display:flex;gap:6px;align-items:center;margin:0;text-transform:none">Show<select data-c="lpsz" style="width:auto;margin:0;padding:4px 8px">${LEAD_PAGE_SIZES.map(n=>`<option ${n===leadPageSz?'selected':''}>${n}</option>`).join('')}</select>per page</label><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
  +(canBulk&&Lp.length?`<div class="row" style="margin:-4px 0 10px;flex-wrap:wrap;gap:8px;align-items:center"><button class="b2" data-a="selectAllLeads">${allSelOnPage?'☑ Deselect all on this page':'☐ Select all on this page'}</button>${selectedLeads.size?`<span class="s">${selectedLeads.size} selected</span><button class="bg" data-a="bulkReassignLeads">👤 Reassign owner</button><button class="b2" data-a="clearLeadSelection">Clear</button>`:''}</div>`:'')
  +(Lp.map(l=>{const open=openLeads.has(l.id);
  const noteCount=l.noteLog?.length||0;
@@ -629,7 +633,7 @@ const A={
  toggleLeadSelect(id){if(isStaff())return;selectedLeads.has(id)?selectedLeads.delete(id):selectedLeads.add(id);render()},
  selectAllLeads(){if(isStaff())return;const q=(window._lq||'').toLowerCase(),mineLeads=S.leads.filter(mine);
   const L=mineLeads.filter(l=>q?(l.company+l.contact+l.services.join()).toLowerCase().includes(q):l.disposition===leadFolder);
-  const{items:Lp}=paginate(L,leadPage);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
+  const{items:Lp}=paginate(L,leadPage,leadPageSz);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
   Lp.forEach(l=>allSel?selectedLeads.delete(l.id):selectedLeads.add(l.id));render()},
  clearLeadSelection(){selectedLeads.clear();render()},
  findDupLeads(){dupClusters=leadDupClusters();openModal(renderDupModal())},
@@ -1064,6 +1068,7 @@ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLower
 document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id==='who')return render();if(!c)return;const id=t.dataset.id;
  if(c==='ldisp'){const l=S.leads.find(l=>l.id===id);l.disposition=t.value;logEv('L'+id,'Status → '+t.value);autoFollowUpOnProposal(l);save('leads','tasks')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
  if(c==='lown'){if(isStaff())return render();S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
+ if(c==='lpsz'){leadPageSz=+t.value;leadPage=0;try{localStorage.setItem('scgLeadPageSz',leadPageSz)}catch(e){}return render()}
  if(c==='step')A.step(id,t)});
 document.addEventListener('input',e=>{const c=e.target.dataset.c;
  const SEARCH={lq:'_lq',cq:'_cq',dq:'_dq',clq:'_clq',iq:'_iq',tq:'_tq',ctq:'_ctq'};
