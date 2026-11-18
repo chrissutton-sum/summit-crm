@@ -63,7 +63,7 @@ html.tv{font-size:24px}html.tv header,html.tv nav{display:none}html.tv body{padd
 </div>
 <div id="app" style="display:none">
 <header><div class="hb"><img class="logo" src="/logo.png" alt="SCG"><h1>SCG CRM<small>Summit Creative Group • Boise, ID</small></h1></div>
-<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a id="scgInsightsLink" class="btn b2" href="/insights/?from=crm" target="_blank" rel="noopener" style="display:none">SCG Insights</a><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" data-a="search" title="Search everything (⌘K / Ctrl+K)">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a id="scgInsightsLink" class="btn b2" href="/insights/?from=crm" target="_blank" rel="noopener" style="display:none">SCG Insights</a><span id="sync" class="s"></span><select id="who" style="width:auto;margin:0;max-width:150px"></select><button class="b2" id="partyBtn" data-a="party" title="Make it rain confetti on everyone's screen" style="display:none">🎉</button><button class="b2" data-a="search" title="Search everything (⌘K / Ctrl+K)">🔍</button><button class="b2" data-a="alerts" id="bell">🔔 0</button><button class="b2" data-a="logout">⎋</button></div></header>
 <div class="wrap" id="main"></div>
 <nav id="nav"></nav>
 <div id="modal"><div id="mbox"></div></div>
@@ -144,7 +144,7 @@ let leadPageSz=(()=>{try{const n=+localStorage.getItem('scgLeadPageSz');return L
 // right state var (leadPage or clientPage) without duplicating this logic.
 function paginate(items,page,sz=PAGESZ){const pages=Math.max(1,Math.ceil(items.length/sz));if(page>=pages)page=pages-1;if(page<0)page=0;return{items:items.slice(page*sz,page*sz+sz),page,pages}}
 function pager(page,pages,action){return pages<=1?'':`<div class="row" style="justify-content:center;gap:12px;margin:14px 0 4px"><button class="b2" ${page<=0?'disabled':''} data-a="${action}" data-id="-1">◀ Previous</button><span class="s" style="align-self:center">Page ${page+1} of ${pages}</span><button class="b2" ${page>=pages-1?'disabled':''} data-a="${action}" data-id="1">Next ▶</button></div>`}
-const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files','campaigns','contacts','trophies'];
+const KEYS=['users','cfg','leads','deals','acts','accts','invoices','recur','templates','log','audit','deliv','props','tasks','files','campaigns','contacts','trophies','party'];
 const el=id=>document.getElementById(id);
 function merge(d){KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]})}
 
@@ -284,7 +284,7 @@ async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
- seenWins=new Set(winKeys());
+ seenWins=new Set(winKeys());seenParty=S.party?.id||'';
  await refreshGoogleStatus();
  await refreshDocusignStatus();
  await refreshAccountsStatus();
@@ -412,7 +412,7 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  // just hidden, so it's obvious why (not missing).
  if(isStaff()){w.innerHTML=`<option value="${MYID}">${esc(ME()?.name||'Me')}</option>`;w.value=MYID;w.disabled=true;w.title="Staff can only view their own records."}
  else{w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';w.disabled=false;w.title=''}
- el('scgInsightsLink').style.display=IS_ADMIN?'inline-block':'none';
+ el('scgInsightsLink').style.display=IS_ADMIN?'inline-block':'none';el('partyBtn').style.display=IS_ADMIN?'':'none';
  // Keep the reporting launch inside the Android WebView to reuse its CRM session.
  if(window.Capacitor?.isNativePlatform?.())el('scgInsightsLink').target='_self';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
@@ -432,9 +432,11 @@ let renderedTab=null;
    did (their win arrives with the next 10-second sync). seenWins starts as the
    wins already there at sign-in, so opening the app never replays old ones.
    A deal won, un-won and won again celebrates again. */
-let seenWins=null;
+let seenWins=null,seenParty=null;
 const winKeys=()=>S.deals.filter(d=>d.stage===WON()).map(d=>d.id);
 function celebrateWins(){if(!seenWins)return;
+ // An admin's "make it rain" (the 🎉 button), played once per blast.
+ if(S.party&&S.party.id!==seenParty){seenParty=S.party.id;winBanner(S.party.msg?`${esc(S.party.by)}: ${esc(S.party.msg)}`:`${esc(S.party.by)} made it rain!`);if(!matchMedia('(prefers-reduced-motion: reduce)').matches)confetti()}
  const fresh=S.deals.filter(d=>d.stage===WON()&&!seenWins.has(d.id));seenWins=new Set(winKeys());
  if(!fresh.length)return;
  const who=d=>d.owner===MYID?'You':uName(d.owner);
@@ -694,6 +696,9 @@ const A={
   const{items:Lp}=paginate(L,leadPage,leadPageSz);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
   Lp.forEach(l=>allSel?selectedLeads.delete(l.id):selectedLeads.add(l.id));render()},
  clearLeadSelection(){selectedLeads.clear();render()},
+ party(){if(!IS_ADMIN)return;openModal(`<h3>🎉 Make it rain</h3><p class="s" style="margin-bottom:10px">Confetti on every open CRM (phone app included) within about 10 seconds.</p><label>Message (optional)</label><input id="partyMsg" maxlength="120" placeholder="e.g. Record month, team!"><div class="row" style="margin-top:12px"><button id="partyGo" style="flex:1">🎉 Make it rain</button><button class="b2" data-a="close">Cancel</button></div>`);
+  const go=async()=>{el('partyGo').disabled=true;try{const r=await api('/api/party',{method:'POST',body:JSON.stringify({msg:el('partyMsg').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start the confetti');S.party=d;closeM();celebrateWins()}catch(e){alert(e.message);el('partyGo').disabled=false}};
+  el('partyGo').onclick=go;el('partyMsg').onkeydown=e=>{if(e.key==='Enter')go()};el('partyMsg').focus()},
  staffLeadScope(v){staffLeadScope=v==='mine'?'mine':'all';leadPage=0;try{localStorage.setItem('scgStaffLeadScope',staffLeadScope)}catch(e){}render()},
  findDupLeads(){dupClusters=leadDupClusters();openModal(renderDupModal())},
  reviewMerge(i){openModal(renderMergeReview(+i))},

@@ -135,6 +135,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     keepRecentAiEdits(rows[0]?.data, data);
     stampWonAt(rows[0]?.data, data);
     trophies.keepTrophies(rows[0]?.data, data);
+    keepParty(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
     connect.announceWins(rows[0]?.data, data);
@@ -147,6 +148,24 @@ app.put('/api/data', requireAuth, async (req, res) => {
     client.release();
   }
   res.json({ ok: true });
+});
+
+// "Make it rain": an admin's confetti blast that every open CRM plays once.
+// data.party is server-owned (only this endpoint sets it), so a browser saving
+// from a stale copy can't undo or fake one.
+function keepParty(before, after) {
+  if (before && before.party) after.party = before.party; else delete after.party;
+}
+app.post('/api/party', requireAuth, requireAdmin, async (req, res) => {
+  const msg = String(req.body?.msg || '').trim().slice(0, 120);
+  let party;
+  await mutateData(d => {
+    const me = (d.users || []).find(u => u.id === req.account.userId);
+    party = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), by: me?.name || req.account.username || 'An admin', msg };
+    d.party = party;
+  });
+  if (!party) return res.status(500).json({ error: 'Could not start the confetti' });
+  res.json(party);
 });
 
 // Read-only snapshot of the blob, for background jobs that only need to look
