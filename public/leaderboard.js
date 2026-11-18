@@ -70,7 +70,7 @@ function streak(days, now) {
 }
 
 const players = S => (S.users || []).filter(u => !((S.cfg && S.cfg.lbOut) || []).includes(u.id));
-const rate = S => (S.cfg && S.cfg.commission != null ? num(S.cfg.commission) : 15) / 100;
+const rate = S => (S.cfg && S.cfg.commission != null ? num(S.cfg.commission) : 12) / 100;
 
 function board(S, win, now) {
   now = now || new Date();

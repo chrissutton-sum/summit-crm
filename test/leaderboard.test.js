@@ -100,3 +100,8 @@ test('stampWonAt: new wins get stamped, old stamps survive stale saves, leaving 
   assert.deepEqual(by, { move: 'NOW', kept: 'T1', old: undefined, back: undefined, new: 'NOW' });
   stampWonAt(null, null);
 });
+
+test('commission defaults to 12% when no rate is set', () => {
+  const S = { cfg, users: [{ id: 'u', name: 'U' }], deals: [{ id: 'd', owner: 'u', stage: 'Won', amount: 1000, wonAt: at(10, 17) }] };
+  assert.equal(LB.board(S, 'month', now).rows[0].comm, 120);
+});
