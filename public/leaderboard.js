@@ -69,6 +69,17 @@ function streak(days, now) {
   return n;
 }
 
+// Longest run of weekdays in a row with a completed call, on or before upto (YYYY-MM-DD).
+function longestStreak(days, upto) {
+  let best = 0, run = 0, prev = null;
+  Object.keys(days).filter(k => days[k] && (!upto || k <= upto)).sort().forEach(k => {
+    const d = new Date(k + 'T12:00'); if (d.getDay() === 0 || d.getDay() === 6) return;
+    const p = new Date(d); do p.setDate(p.getDate() - 1); while (p.getDay() === 0 || p.getDay() === 6);
+    run = prev === ymd(p) ? run + 1 : 1; prev = k; if (run > best) best = run;
+  });
+  return best;
+}
+const monthKey = d => ymd(d).slice(0, 7);
 const players = S => (S.users || []).filter(u => !((S.cfg && S.cfg.lbOut) || []).includes(u.id));
 const rate = S => (S.cfg && S.cfg.commission != null ? num(S.cfg.commission) : 12) / 100;
 
@@ -91,8 +102,8 @@ function extras(S, now) {
   now = now || new Date();
   const mFrom = winStart('month', now), ids = new Set(players(S).map(u => u.id));
   const wins = (S.deals || []).map(d => ({ d, at: wonDate(S, d) })).filter(x => x.at && !isNaN(x.at) && ids.has(x.d.owner)).sort((a, b) => a.at - b.at);
-  const first = wins.find(x => x.at >= mFrom) || null;
   const end = new Date(mFrom); end.setMonth(end.getMonth() + 1);
+  const first = wins.find(x => x.at >= mFrom && x.at < end) || null;
   const feed = [];
   const since = new Date(+now - 14 * DAY);
   wins.filter(x => x.at >= since).forEach(x => feed.push({ at: x.at, who: x.d.owner, kind: 'win', text: 'Closed ' + (x.d.account || x.d.name), amount: num(x.d.amount) }));
@@ -128,6 +139,6 @@ function profiles(S, now) {
   return { avgC, avgR, rows: b.rows.map(x => ({ ...x, tag: tag(x), cpc: x.won ? x.calls / x.won : null, rpc: x.calls ? x.rev / x.calls : null })) };
 }
 
-const LB = { WINDOWS, winStart, winEnd, wonDate, tally, streak, board, extras, trend, profiles, ymd };
+const LB = { WINDOWS, winStart, winEnd, wonDate, tally, callDays, streak, longestStreak, players, board, extras, trend, profiles, ymd, monthKey };
 if (typeof module !== 'undefined' && module.exports) module.exports = LB; else root.LB = LB;
 })(typeof window !== 'undefined' ? window : globalThis);

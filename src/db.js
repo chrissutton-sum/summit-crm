@@ -46,7 +46,7 @@ function defaultData() {
       ],
     },
     leads: [], deals: [], acts: [], accts: [], invoices: [], recur: [],
-    log: [], audit: [], deliv: [], props: [], tasks: [], files: [], contacts: [],
+    log: [], audit: [], deliv: [], props: [], tasks: [], files: [], contacts: [], trophies: { months: [], awards: [], records: {} },
     templates: [
       { id: 't1', name: 'Intro follow-up', subject: 'Great connecting, {{contact}}', body: 'Hi {{contact}},\n\nThanks for taking the time to talk about {{client}}. I\'d love to share how Summit Creative can help grow your visibility in the Treasure Valley. Would a quick call this week work?\n\n{{rep}}\nSummit Creative Group' },
       { id: 't2', name: 'Proposal sent', subject: 'Your Summit Creative proposal', body: 'Hi {{contact}},\n\nAttached is the proposal for {{client}}. Happy to walk through it and adjust the scope. What day works for a short review?\n\n{{rep}}\nSummit Creative Group' },

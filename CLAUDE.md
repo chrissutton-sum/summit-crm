@@ -16,7 +16,7 @@ Node 18+, Express 4, `pg`, JWT logins (`bcryptjs`), MCP SDK + `zod` for the AI c
 npm install
 DATABASE_URL=postgres://... JWT_SECRET=dev npm start     # tables are created on boot
 npm run seed                                              # once, prints 3 starter logins
-node --test test/reporting.test.js test/connect.test.js test/leaderboard.test.js  # no database needed
+node --test test/reporting.test.js test/connect.test.js test/leaderboard.test.js test/trophies.test.js  # no database needed
 MCP_TEST_DATABASE_URL=postgres://... node --test test/mcp.test.js   # WIPES that database
 ```
 
@@ -36,6 +36,7 @@ There is no `npm test` script. Never point `MCP_TEST_DATABASE_URL` at the real N
 | `src/google.js`, `src/docusign.js`, `src/ics.js` | Gmail send and Google Calendar, DocuSign envelopes, iCal feed parsing |
 | `src/push.js` | Android push through Firebase (`FCM_SERVICE_ACCOUNT_JSON`) |
 | `src/reporting.js` | Read-only reporting API for SCG Insights |
+| `src/trophies.js` | Month-end trophy case: saves each finished month's leaderboard winners and records in `trophies` (hourly check) |
 | `src/wonAt.js` | Stamps `deal.wonAt` on every save when a deal enters the won stage |
 | `public/leaderboard.js` | Leaderboard math (ranks, windows, streaks, badges, manager trends), shared by the 🏆 tab and its tests |
 | `public/index.html` | The whole CRM UI (~1,100 lines) |
@@ -45,7 +46,7 @@ There is no `npm test` script. Never point `MCP_TEST_DATABASE_URL` at the real N
 
 ## How the data works (read this before changing anything)
 
-- All CRM data is **one JSON document** in `crm_data` (row `id = 1`). Keys: `users`, `cfg`, `leads`, `deals`, `contacts`, `accts`, `acts`, `tasks`, `invoices`, `recur`, `log`, `audit`, `deliv`, `props`, `files`, `templates`.
+- All CRM data is **one JSON document** in `crm_data` (row `id = 1`). Keys: `users`, `cfg`, `leads`, `deals`, `contacts`, `accts`, `acts`, `tasks`, `invoices`, `recur`, `log`, `audit`, `deliv`, `props`, `files`, `templates`, `trophies`.
 - The browser loads the whole document with `GET /api/data`, edits it in memory, and saves the whole thing with `PUT /api/data`. Tabs re-pull about every 10 seconds.
 - Logins are separate, in the `accounts` table. `accounts.user_id` points at an entry in `users[]`.
 - Any server-side write must lock the row (`SELECT ... FOR UPDATE`). Use `crmStore.mutate()` or `mutateData()` in `server.js`. A plain `UPDATE` will lose someone's save.
@@ -53,6 +54,7 @@ There is no `npm test` script. Never point `MCP_TEST_DATABASE_URL` at the real N
 - Stage convention used everywhere: the **second-to-last** entry of `cfg.stages` is "won", the **last** is "lost". Don't match on the literal names, teams can rename them.
 - Default data lives in two places, `defaultData()` in `src/db.js` and `DEF()` in `public/index.html`. Change both.
 - `deal.wonAt` is when a deal entered the won stage, set by the page, the connector and `stampWonAt` on save. Deals won before it existed have none; the leaderboard falls back to the client record's `created` date.
+- `trophies` is server-owned: `keepTrophies` puts the database copy back on every browser save, so only `src/trophies.js` writes it. The server runs in `America/Boise` time (set at the top of `server.js`) so month boundaries match the office.
 - Schema changes are additive and run on boot (`ADD COLUMN IF NOT EXISTS`, or a small idempotent migration like `ensureNotInterestedDisp`).
 
 ## Connector rules (`src/mcp.js`)

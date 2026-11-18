@@ -1,3 +1,5 @@
+// Month and week boundaries (leaderboard trophies) follow the office's clock, not UTC.
+process.env.TZ = process.env.TZ || 'America/Boise';
 const path = require('path');
 const dns = require('dns').promises;
 const express = require('express');
@@ -16,6 +18,7 @@ const mcp = require('./mcp');
 const push = require('./push');
 const { keepRecentAiEdits } = require('./crmStore');
 const { stampWonAt } = require('./wonAt');
+const trophies = require('./trophies');
 
 const app = express();
 // Render sits behind a proxy; needed for correct client IPs and https URLs
@@ -131,6 +134,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     keepRecentTransfers(rows[0]?.data, data);
     keepRecentAiEdits(rows[0]?.data, data);
     stampWonAt(rows[0]?.data, data);
+    trophies.keepTrophies(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
     connect.announceWins(rows[0]?.data, data);
@@ -400,6 +404,10 @@ init()
   .then(() => {
     app.listen(PORT, () => console.log(`Summit CRM server listening on :${PORT}`));
     push.startPeriodicChecks(getData);
+    // Hand out last month's leaderboard trophies once it ends (and catch up after a sleep).
+    const awardTrophies = () => trophies.run(getData, mutateData).catch(e => console.error('[trophies] failed:', e.message));
+    awardTrophies();
+    setInterval(awardTrophies, 60 * 60 * 1000);
     // Separate, more frequent timer for Gmail reply logging — a reply
     // sitting unlogged for up to an hour (push.js's cadence) would make the
     // "two-way" part feel broken, so this checks every 5 minutes instead.
