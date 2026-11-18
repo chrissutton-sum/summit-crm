@@ -436,7 +436,7 @@ let seenWins=null,seenParty=null;
 const winKeys=()=>S.deals.filter(d=>d.stage===WON()).map(d=>d.id);
 function celebrateWins(){if(!seenWins)return;
  // An admin's "make it rain" (the 🎉 button), played once per blast.
- if(S.party&&S.party.id!==seenParty){seenParty=S.party.id;winBanner(S.party.msg?`${esc(S.party.by)}: ${esc(S.party.msg)}`:`${esc(S.party.by)} made it rain!`);if(!matchMedia('(prefers-reduced-motion: reduce)').matches)confetti()}
+ if(S.party&&S.party.id!==seenParty){seenParty=S.party.id;winBanner(S.party.msg?`${esc(S.party.by)}: ${esc(S.party.msg)}`:`${esc(S.party.by)} made it rain!`);if(!matchMedia('(prefers-reduced-motion: reduce)').matches)confetti(S.party.style)}
  const fresh=S.deals.filter(d=>d.stage===WON()&&!seenWins.has(d.id));seenWins=new Set(winKeys());
  if(!fresh.length)return;
  const who=d=>d.owner===MYID?'You':uName(d.owner);
@@ -448,15 +448,30 @@ function winBanner(html){let box=el('winBox');
  const b=document.createElement('div');
  b.style.cssText='background:var(--card);border:1px solid var(--gold);color:var(--tx);padding:12px 18px;border-radius:12px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.5);text-align:center;cursor:pointer';
  b.innerHTML='🎉 '+html+' 🎉';b.onclick=()=>b.remove();box.appendChild(b);setTimeout(()=>b.remove(),7000)}
-function confetti(){const c=document.createElement('canvas'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight;
+// Celebration effects. confetti(style) plays one for ~4.5s on a canvas over
+// the page; 'confetti' is the default (deal wins), the rest are for the admin 🎉 button.
+const PARTY_STYLES=[['confetti','🎊 Confetti'],['stars','⭐ Stars'],['fireworks','💥 Explosions'],['money','💵 Money'],['trophies','🏆 Trophies']];
+function confetti(style='confetti'){const c=document.createElement('canvas'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight;
  c.style.cssText='position:fixed;inset:0;z-index:10000;pointer-events:none';document.body.appendChild(c);
- const cols=['#00e0f5','#0b74b8','#f59e0b','#e8ebf0','#10b981'],P=Array.from({length:Math.min(260,Math.round(W*H/5000))},()=>({
-  x:Math.random()*W,y:-20-Math.random()*H*.6,w:6+Math.random()*6,h:8+Math.random()*8,vx:-2+Math.random()*4,vy:2+Math.random()*4,
-  r:Math.random()*6.3,vr:-.2+Math.random()*.4,c:cols[Math.random()*cols.length|0]}));
- const end=performance.now()+4500;
- (function f(t){x.clearRect(0,0,W,H);const fade=Math.min(1,(end-t)/800);x.globalAlpha=Math.max(0,fade);
-  P.forEach(p=>{p.x+=p.vx+Math.sin((t/400)+p.r);p.y+=p.vy;p.vy=Math.min(p.vy+.05,7);p.r+=p.vr;
-   x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.r)));x.restore()});
+ const cols=['#00e0f5','#0b74b8','#f59e0b','#e8ebf0','#10b981'],R=Math.random,pick=a=>a[R()*a.length|0],end=performance.now()+4500;
+ const n=Math.min(260,Math.round(W*H/5000));let P=[],bursts=0,nextBurst=0;
+ const star=(r)=>{x.beginPath();for(let i=0;i<10;i++){const a=i*Math.PI/5-Math.PI/2,d=i%2?r*.45:r;x.lineTo(Math.cos(a)*d,Math.sin(a)*d)}x.closePath();x.fill()};
+ if(style==='fireworks'){/* bursts are spawned in the loop */}
+ else{const emoji=style==='money'?['💵','💸','💰']:style==='trophies'?['🏆','🥇','🎉']:null,count=emoji?Math.round(n*.3):style==='stars'?Math.round(n*.5):n;
+  P=Array.from({length:count},()=>({x:R()*W,y:-30-R()*H*.6,w:6+R()*6,h:8+R()*8,s:emoji?22+R()*16:8+R()*10,vx:-2+R()*4,vy:emoji||style==='stars'?1.5+R()*2.5:2+R()*4,r:R()*6.3,vr:-.2+R()*.4,c:pick(style==='stars'?['#f59e0b','#00e0f5','#e8ebf0']:cols),e:emoji&&pick(emoji)}))}
+ (function f(t){x.clearRect(0,0,W,H);x.globalAlpha=Math.max(0,Math.min(1,(end-t)/800));
+  if(style==='fireworks'&&t<end-1200&&t>=nextBurst&&bursts<9){bursts++;nextBurst=t+350+R()*250;
+   const bx=W*(.15+R()*.7),by=H*(.15+R()*.4),bc=pick(cols);
+   for(let i=0;i<90;i++){const a=R()*6.3,v=2+R()*6;P.push({x:bx,y:by,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1,c:R()<.7?bc:'#e8ebf0',fw:1})}}
+  P.forEach(p=>{
+   if(p.fw){p.x+=p.vx;p.y+=p.vy;p.vx*=.97;p.vy=p.vy*.97+.08;p.life-=.012;if(p.life<=0)return;
+    x.save();x.globalAlpha*=p.life;x.fillStyle=p.c;x.beginPath();x.arc(p.x,p.y,3.2,0,6.3);x.fill();x.restore();return}
+   p.x+=p.vx+Math.sin((t/400)+p.r);p.y+=p.vy;p.vy=Math.min(p.vy+.04,p.e||style==='stars'?4:7);p.r+=p.vr;
+   x.save();x.translate(p.x,p.y);x.rotate(style==='stars'||p.e?p.r*.3:p.r);x.fillStyle=p.c;
+   if(p.e){x.font=p.s+'px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(p.e,0,0)}
+   else if(style==='stars'){x.globalAlpha*=.7+.3*Math.sin(t/120+p.r*5);star(p.s)}
+   else x.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.r)));x.restore()});
+  if(style==='fireworks')P=P.filter(p=>p.life>0);
   t<end?requestAnimationFrame(f):c.remove()})(performance.now())}
 // Scrolled elements are keyed by tag + class + position among same-keyed siblings in #main.
 function scrollKey(e){return e.tagName+'.'+(e.className||'')}
@@ -696,8 +711,10 @@ const A={
   const{items:Lp}=paginate(L,leadPage,leadPageSz);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
   Lp.forEach(l=>allSel?selectedLeads.delete(l.id):selectedLeads.add(l.id));render()},
  clearLeadSelection(){selectedLeads.clear();render()},
- party(){if(!IS_ADMIN)return;openModal(`<h3>🎉 Make it rain</h3><p class="s" style="margin-bottom:10px">Confetti on every open CRM (phone app included) within about 10 seconds.</p><label>Message (optional)</label><input id="partyMsg" maxlength="120" placeholder="e.g. Record month, team!"><div class="row" style="margin-top:12px"><button id="partyGo" style="flex:1">🎉 Make it rain</button><button class="b2" data-a="close">Cancel</button></div>`);
-  const go=async()=>{el('partyGo').disabled=true;try{const r=await api('/api/party',{method:'POST',body:JSON.stringify({msg:el('partyMsg').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start the confetti');S.party=d;closeM();celebrateWins()}catch(e){alert(e.message);el('partyGo').disabled=false}};
+ party(){if(!IS_ADMIN)return;openModal(`<h3>🎉 Make it rain</h3><p class="s" style="margin-bottom:10px">Confetti on every open CRM (phone app included) within about 10 seconds.</p><label>Effect</label><div id="partyStyle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${PARTY_STYLES.map(([k,l],i)=>`<button type="button" class="${i?'b2':''}" data-k="${k}">${l}</button>`).join('')}</div><button type="button" class="b2" id="partyPreview" style="margin-bottom:10px">👀 Preview on my screen only</button><label>Message (optional)</label><input id="partyMsg" maxlength="120" placeholder="e.g. Record month, team!"><div class="row" style="margin-top:12px"><button id="partyGo" style="flex:1">🎉 Make it rain</button><button class="b2" data-a="close">Cancel</button></div>`);
+  let style='confetti';el('partyStyle').querySelectorAll('button').forEach(b=>b.onclick=()=>{style=b.dataset.k;el('partyStyle').querySelectorAll('button').forEach(o=>o.className=o===b?'':'b2')});
+  el('partyPreview').onclick=()=>confetti(style);
+  const go=async()=>{el('partyGo').disabled=true;try{const r=await api('/api/party',{method:'POST',body:JSON.stringify({msg:el('partyMsg').value,style})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start the confetti');S.party=d;closeM();celebrateWins()}catch(e){alert(e.message);el('partyGo').disabled=false}};
   el('partyGo').onclick=go;el('partyMsg').onkeydown=e=>{if(e.key==='Enter')go()};el('partyMsg').focus()},
  staffLeadScope(v){staffLeadScope=v==='mine'?'mine':'all';leadPage=0;try{localStorage.setItem('scgStaffLeadScope',staffLeadScope)}catch(e){}render()},
  findDupLeads(){dupClusters=leadDupClusters();openModal(renderDupModal())},
