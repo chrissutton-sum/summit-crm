@@ -284,6 +284,7 @@ async function boot(){
  el('loginScreen').style.display='none';el('app').style.display='block';
  MYNAME=(JSON.parse(atob(TOKEN.split('.')[1]))||{}).username||'';
  await pullData(true);
+ seenWins=new Set(winKeys());
  await refreshGoogleStatus();
  await refreshDocusignStatus();
  await refreshAccountsStatus();
@@ -422,8 +423,39 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  // element was and put it back when the same tab re-renders.
  const m=el('main'),sameTab=renderedTab===tab,y=scrollY,saved=sameTab?scrolledIn(m):[];
  m.innerHTML=v();renderedTab=tab;
- if(sameTab){saved.forEach(([key,l,t])=>{const e=findScrolled(m,key);if(e){e.scrollLeft=l;e.scrollTop=t}});if(scrollY!==y)scrollTo(scrollX,y)}}
+ if(sameTab){saved.forEach(([key,l,t])=>{const e=findScrolled(m,key);if(e){e.scrollLeft=l;e.scrollTop=t}});if(scrollY!==y)scrollTo(scrollX,y)}
+ celebrateWins()}
 let renderedTab=null;
+/* ===== 🎉 Sale celebration =====
+   Every open CRM (phone app included) checks after each render whether a deal
+   has newly reached the won stage, whether this person moved it or a teammate
+   did (their win arrives with the next 10-second sync). seenWins starts as the
+   wins already there at sign-in, so opening the app never replays old ones.
+   A deal won, un-won and won again celebrates again. */
+let seenWins=null;
+const winKeys=()=>S.deals.filter(d=>d.stage===WON()).map(d=>d.id);
+function celebrateWins(){if(!seenWins)return;
+ const fresh=S.deals.filter(d=>d.stage===WON()&&!seenWins.has(d.id));seenWins=new Set(winKeys());
+ if(!fresh.length)return;
+ const who=d=>d.owner===MYID?'You':uName(d.owner);
+ const msg=fresh.length===1?`${who(fresh[0])} closed <b>${esc(fresh[0].account||fresh[0].name)}</b> · ${$(fresh[0].amount)}/mo`:`${fresh.length} deals just closed · ${$(fresh.reduce((t,d)=>t+(+d.amount||0),0))}/mo`;
+ winBanner(msg);
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches)confetti()}
+function winBanner(html){let box=el('winBox');
+ if(!box){box=document.createElement('div');box.id='winBox';box.style.cssText='position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:10001;display:flex;flex-direction:column;gap:8px;align-items:center;width:max-content;max-width:calc(100vw - 32px)';document.body.appendChild(box)}
+ const b=document.createElement('div');
+ b.style.cssText='background:var(--card);border:1px solid var(--gold);color:var(--tx);padding:12px 18px;border-radius:12px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.5);text-align:center;cursor:pointer';
+ b.innerHTML='🎉 '+html+' 🎉';b.onclick=()=>b.remove();box.appendChild(b);setTimeout(()=>b.remove(),7000)}
+function confetti(){const c=document.createElement('canvas'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight;
+ c.style.cssText='position:fixed;inset:0;z-index:10000;pointer-events:none';document.body.appendChild(c);
+ const cols=['#00e0f5','#0b74b8','#f59e0b','#e8ebf0','#10b981'],P=Array.from({length:Math.min(260,Math.round(W*H/5000))},()=>({
+  x:Math.random()*W,y:-20-Math.random()*H*.6,w:6+Math.random()*6,h:8+Math.random()*8,vx:-2+Math.random()*4,vy:2+Math.random()*4,
+  r:Math.random()*6.3,vr:-.2+Math.random()*.4,c:cols[Math.random()*cols.length|0]}));
+ const end=performance.now()+4500;
+ (function f(t){x.clearRect(0,0,W,H);const fade=Math.min(1,(end-t)/800);x.globalAlpha=Math.max(0,fade);
+  P.forEach(p=>{p.x+=p.vx+Math.sin((t/400)+p.r);p.y+=p.vy;p.vy=Math.min(p.vy+.05,7);p.r+=p.vr;
+   x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.r)));x.restore()});
+  t<end?requestAnimationFrame(f):c.remove()})(performance.now())}
 // Scrolled elements are keyed by tag + class + position among same-keyed siblings in #main.
 function scrollKey(e){return e.tagName+'.'+(e.className||'')}
 function scrolledIn(root){const seen={},out=[];root.querySelectorAll('*').forEach(e=>{const k=scrollKey(e);seen[k]=(seen[k]||0)+1;if(e.scrollLeft||e.scrollTop)out.push([k+'#'+seen[k],e.scrollLeft,e.scrollTop])});return out}
