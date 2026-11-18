@@ -184,6 +184,16 @@ test('staff logins cannot reassign leads', { skip }, async () => {
   assert.match((await call(t, 'update_lead', { id: 'old1', owner: 'Jordan' })).error, /Staff/);
 });
 
+test('leads carry a website', { skip }, async () => {
+  const { access_token: t } = await connect('alex');
+  const l = await call(t, 'create_lead', { company: 'Eagle Electric', website: ' eagleelectric.com ' });
+  assert.equal(l.data.website, 'eagleelectric.com');
+  const u = await call(t, 'update_lead', { id: l.data.id, website: 'https://eagleelectric.com/home' });
+  assert.equal(u.data.website, 'https://eagleelectric.com/home');
+  const found = await call(t, 'search_crm', { query: 'eagleelectric.com' });
+  assert.ok(found.data.results.some(r => r.id === l.data.id));
+});
+
 test('staff logins can see every lead but only change their own', { skip }, async () => {
   const { access_token: t } = await connect('jordan');
   const seen = await call(t, 'get_lead', { id: 'old1' });

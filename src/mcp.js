@@ -77,7 +77,7 @@ const campaignName = (data, id) => (data.campaigns || []).find(c => c.id === id)
 // ---- Shapes returned to the AI
 
 const leadOut = (data, l) => ({
-  id: l.id, type: 'lead', company: l.company, contact: l.contact || '', phone: l.phone || '', email: l.email || '',
+  id: l.id, type: 'lead', company: l.company, contact: l.contact || '', phone: l.phone || '', email: l.email || '', website: l.website || '',
   status: l.disposition || '', owner: userName(data, l.owner), source: l.source || '',
   campaign: campaignName(data, l.campaign), monthly_value: Number(l.value) || 0, services: l.services || [], notes: l.notes || '',
 });
@@ -123,7 +123,7 @@ const clean = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== 
 
 function leadFields(data, ctx, a, existing) {
   const f = clean({
-    company: a.company, contact: a.contact, phone: a.phone, email: a.email,
+    company: a.company, contact: a.contact, phone: a.phone, email: a.email, website: a.website?.trim(),
     source: pickOne(SOURCES, a.source, 'source'),
     disposition: pickOne(data.cfg?.disps || [], a.status, 'status'),
     services: services(data, a.services), notes: a.notes,
@@ -234,7 +234,7 @@ function buildServer(ctx) {
     const hit = (...vals) => vals.some(v => norm(v).includes(q)) || (digits.length >= 4 && vals.some(v => String(v || '').replace(/\D/g, '').includes(digits)));
     const want = t => !types?.length || types.includes(t);
     const out = [];
-    if (want('lead')) for (const l of data.leads || []) if (hit(l.company, l.contact, l.email, l.phone)) out.push({ type: 'lead', id: l.id, company: l.company, contact: l.contact, status: l.disposition, owner: userName(data, l.owner) });
+    if (want('lead')) for (const l of data.leads || []) if (hit(l.company, l.contact, l.email, l.phone, l.website)) out.push({ type: 'lead', id: l.id, company: l.company, contact: l.contact, status: l.disposition, owner: userName(data, l.owner) });
     if (want('deal')) for (const d of data.deals || []) if (hit(d.name, d.account, d.contact, d.email, d.phone)) out.push({ type: 'deal', id: d.id, name: d.name, client: d.account, stage: d.stage, amount: Number(d.amount) || 0, owner: userName(data, d.owner) });
     if (want('contact')) for (const k of data.contacts || []) if (hit(k.name, k.company, k.email, k.phone)) out.push({ type: 'contact', id: k.id, name: k.name, company: k.company, owner: userName(data, k.owner) });
     return { total: out.length, results: out.slice(0, 30) };
@@ -269,6 +269,7 @@ function buildServer(ctx) {
   const leadInput = {
     company: z.string().optional(), contact: z.string().optional().describe('Contact person'),
     phone: z.string().optional(), email: z.string().optional(),
+    website: z.string().optional().describe('The business’s website or main web page'),
     source: z.string().optional().describe('Lead source from crm_overview'),
     status: z.string().optional().describe('Lead status from crm_overview'),
     owner: z.string().optional().describe(fieldDesc.owner),

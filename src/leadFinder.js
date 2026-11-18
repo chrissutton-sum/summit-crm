@@ -99,6 +99,7 @@ function mount(app) {
         contact: '',
         phone: b.phone || '',
         email: '',
+        website: b.website || '',
         source: 'Cold outreach',
         disposition: data.cfg?.disps?.[0] || 'New Lead',
         value: 0,
