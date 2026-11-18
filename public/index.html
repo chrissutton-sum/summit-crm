@@ -41,6 +41,11 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 #mbox{background:var(--panel);border:1px solid var(--cyan);border-radius:12px;max-width:580px;margin:10px auto;padding:16px}
 .chk{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--inp);padding:9px;border-radius:7px;margin-bottom:9px;border:1px solid var(--bd)}.chk label{display:flex;gap:6px;align-items:center;text-transform:none;font-weight:400;font-size:.82rem;color:var(--tx);margin:0}.chk input{width:auto;margin:0}
 .li{display:grid;grid-template-columns:24px 1fr 90px;gap:8px;align-items:center;margin-bottom:6px;font-size:.85rem}.li input{margin:0}
+.lbg{display:grid;gap:12px}@media(min-width:900px){.lbg{grid-template-columns:minmax(0,1fr) 300px}}
+.lbr{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:center}.lbr .rk{font-size:1.5rem;font-weight:800;color:var(--mut)}.lbr .bar{margin:6px 0 8px}
+.card.one{border-color:var(--gold)}.card.one .rk{color:var(--gold)}.card.me{border-color:var(--cyan)}
+.lbv{font-size:1.35rem;font-weight:800}.lbs{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.8rem;color:var(--mut)}.lbs b{color:var(--tx)}
+html.tv{font-size:24px}html.tv header,html.tv nav{display:none}html.tv body{padding-bottom:0}html.tv .wrap{max-width:none;padding:24px 36px}
 @media print{body>*:not(#modal){display:none!important}#modal{position:static;background:#fff;padding:0}#mbox{border:0;background:#fff;color:#000;max-width:100%}#mbox *{color:#000!important;background:#fff!important;border-color:#999!important}.np{display:none!important}}
 </style></head><body>
 <div id="loginScreen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px">
@@ -64,6 +69,7 @@ nav{overflow-x:auto}nav div{flex:1 0 58px;text-align:center;font-size:.62rem;col
 <div id="modal"><div id="mbox"></div></div>
 </div>
 <script src="/native.js"></script>
+<script src="/leaderboard.js"></script>
 <script>
 /* ===== Data & storage: shared via db capability, falls back to localStorage ===== */
 const KEY='summit_crm_v4', uid=()=>Math.random().toString(36).slice(2,10), $=n=>'$'+Math.round(n||0).toLocaleString();
@@ -389,7 +395,7 @@ function form(title,fields,v,onSave){
  el('fsave').onclick=()=>{const o={};fields.forEach(f=>{const e=el('f_'+f.k);o[f.k]=f.t==='srv'?[...e.querySelectorAll('input:checked')].map(i=>i.value):f.t==='number'?Number(e.value)||0:e.value.trim()});{const lbl=title+': '+(o.company||o.name||o.title||o.client||'');if(onSave(o)!==false){aud(lbl);closeM()}}}}
 const $$=n=>Math.round(n).toLocaleString();
 /* ===== Views ===== */
-const TABS=[['dash','📊','Analytics'],['camp','📣','Campaigns'],['leads','🎯','Leads'],['contacts','📇','Contacts'],['deals','💼','Deals'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
+const TABS=[['dash','📊','Analytics'],['camp','📣','Campaigns'],['leads','🎯','Leads'],['contacts','📇','Contacts'],['deals','💼','Deals'],['lb','🏆','Leaderboard'],['cal','📅','Calendar'],['tasks','✅','Tasks'],['clients','🚀','Clients'],['inv','🧾','Invoices'],['ins','📈','Insights'],['set','⚙️','Settings']];
 function init(){el('nav').innerHTML=TABS.map(t=>`<div data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');render();runRecurring()}
 function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdue();
  const w=el('who'),cur=w.value||'ALL';
@@ -404,7 +410,7 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  if(window.Capacitor?.isNativePlatform?.())el('scgInsightsLink').target='_self';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
  el('bell').textContent='🔔 '+S.acts.filter(a=>dueNow(a)&&a.pri==='High').length;
- const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns}[tab];
+ const v={dash:vDash,camp:vCampaigns,leads:vLeads,contacts:vContacts,deals:vDeals,cal:vCal,clients:vClients,inv:vInv,set:vSet,tasks:vTasks,ins:vIns,lb:vLb}[tab];
  // A refresh used to rebuild the view and snap the Deals board (and any other
  // scrolled box) back to the start every 10 seconds. Remember where each scrolled
  // element was and put it back when the same tab re-renders.
@@ -753,7 +759,7 @@ const A={
   doDownload(`summit_${name}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'))}
 };
 function mkAcct(o){return{id:uid(),status:'Active',created:today(),name:o.name,contact:o.contact||'',phone:o.phone||'',owner:o.owner,retainer:o.retainer||0,steps:S.cfg.onboard.map(t=>({id:uid(),text:t,done:false}))}}
-function wonCheck(d){lostCheck(d);if(d.lastStage!==d.stage){if(d.lastStage)logEv('D'+d.id,'Stage → '+d.stage);d.lastStage=d.stage}if(d.stage===WON()&&!S.accts.some(a=>a.dealId===d.id)){const a=mkAcct({name:d.account,contact:d.contact,phone:d.phone,owner:d.owner,retainer:d.amount});a.dealId=d.id;S.accts.unshift(a)}}
+function wonCheck(d){lostCheck(d);if(d.stage===WON()){if(d.lastStage!==d.stage&&!d.wonAt)d.wonAt=new Date().toISOString()}else delete d.wonAt;if(d.lastStage!==d.stage){if(d.lastStage)logEv('D'+d.id,'Stage → '+d.stage);d.lastStage=d.stage}if(d.stage===WON()&&!S.accts.some(a=>a.dealId===d.id)){const a=mkAcct({name:d.account,contact:d.contact,phone:d.phone,owner:d.owner,retainer:d.amount});a.dealId=d.id;S.accts.unshift(a)}}
 async function doDownload(f,data){if(dl){try{await dl.save({filename:f,data});return}catch(e){if(e&&e.code==='declined')return}}
  const u=URL.createObjectURL(new Blob([data]));const a=document.createElement('a');a.href=u;a.download=f;a.click()}
 /* ===== Proposal generator ===== */
@@ -876,6 +882,45 @@ function vTasks(){const q=(window._tq||'').toLowerCase();
  <input placeholder="Search…" value="${esc(window._tq||'')}" data-c="tq" style="margin-bottom:10px">
  ${T.map(k=>`<div class="card" style="${k.done?'opacity:.5':''}"><div class="row"><div><div class="t" style="${k.done?'text-decoration:line-through':''}">${esc(k.title)}</div><div class="s">👤 ${uTag(k.owner)} • due ${esc(k.due||'—')}${k.ref&&k.ref[0]==='L'?` • 🎯 <a data-a="gotoLead" data-id="${k.ref.slice(1)}" style="color:var(--cyan);cursor:pointer">${esc(nameOf(k.ref))}</a>`:''}</div></div>${!k.done&&od(k)?'<span class="badge r">OVERDUE</span>':''}</div>${k.items.map(i=>`<label style="display:flex;gap:8px;text-transform:none;font-weight:400;font-size:.84rem;color:var(--tx);margin:4px 0"><input type="checkbox" style="width:auto;margin:0" ${i.done?'checked':''} data-c="titem" data-id="${k.id}" data-s="${i.id}">${esc(i.t)}</label>`).join('')}<div class="acts"><button class="b2" data-a="togTask" data-id="${k.id}">${k.done?'↩':'✅ Done'}</button><button class="b2" data-a="editTask" data-id="${k.id}">✏️</button><button class="bd" data-a="delTask" data-id="${k.id}">🗑️</button></div></div>`).join('')||'<div class="card s">No tasks.</div>'}
  <h3 style="margin:14px 0 8px">📦 Client deliverables due</h3>${D.map(d=>`<div class="card"><div class="row"><div><div class="t">${esc(d.title)}</div><div class="s">🏢 ${esc(nameOf('C'+d.acct)||'—')} • 👤 ${uTag(d.owner)} • due ${esc(d.due||'—')}${d.repeat==='Monthly'?' • 🔁':''}</div></div>${od(d)?'<span class="badge r">OVERDUE</span>':''}</div><div class="acts"><button class="b2" data-a="togDeliv" data-id="${d.id}">✅ Delivered</button></div></div>`).join('')||'<div class="card s">Nothing due. Add deliverables from a client card (📦).</div>'}`}
+/* ===== Leaderboard (math lives in /leaderboard.js) ===== */
+let lbWin='month',lbRep=null;
+const lbFirst=n=>String(n||'').split(' ')[0];
+const lbNowLocal=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())};
+// 8-week trend for the manager view: bars are calls, the line is closed revenue.
+function lbTrendSvg(T){const W=320,H=120,b=18,mr=Math.max(1,...T.map(w=>w.rev)),mc=Math.max(1,...T.map(w=>w.calls)),x=i=>14+i*((W-28)/(T.length-1)),yr=v=>H-b-v/mr*(H-b-10);
+ const bars=T.map((w,i)=>{const h=w.calls/mc*(H-b-10);return`<rect x="${x(i)-9}" y="${H-b-h}" width="18" height="${h}" fill="#1c3e68"><title>${esc(w.calls)} calls</title></rect>`}).join('');
+ const pts=T.map((w,i)=>x(i)+','+yr(w.rev).toFixed(1)).join(' ');
+ const dots=T.map((w,i)=>`<circle cx="${x(i)}" cy="${yr(w.rev).toFixed(1)}" r="3.5" fill="#00e0f5"><title>${esc($(w.rev))} closed</title></circle>`).join('');
+ const lab=i=>T[i].from.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+ return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="Weekly closed revenue and calls, last ${T.length} weeks"><line x1="0" y1="${H-b}" x2="${W}" y2="${H-b}" stroke="#1c3e68"/>${bars}<polyline points="${pts}" fill="none" stroke="#00e0f5" stroke-width="2.5" stroke-linejoin="round"/>${dots}<text x="4" y="${H-3}" font-size="10" fill="#9ca8b8">${esc(lab(0))}</text><text x="${W-4}" y="${H-3}" font-size="10" fill="#9ca8b8" text-anchor="end">${esc(lab(T.length-1))}</text></svg>`}
+function vLb(){const now=new Date(),B=LB.board(S,lbWin,now),X=LB.extras(S,now),top=Math.max(1,B.rows[0]?.rev||0),me=B.rows.find(r=>r.id===MYID),tv=document.documentElement.classList.contains('tv'),wl=(LB.WINDOWS.find(w=>w[0]===lbWin)||[])[1]||'';
+ const pct=Math.round((S.cfg.commission??15)*100)/100;
+ const head=`<div class="row" style="margin-bottom:10px;align-items:center"><h2>🏆 Leaderboard</h2><div style="display:flex;gap:6px;flex-wrap:wrap">${LB.WINDOWS.map(([id,l])=>`<button class="${id===lbWin?'':'b2'}" data-a="lbWin" data-id="${id}">${l}</button>`).join('')}${tv?'<button class="b2" data-a="lbTv">✕ Exit TV</button>':`<button class="b2" data-a="lbLog">+ Log call / meeting</button><button class="b2" data-a="lbTv">📺 TV mode</button>`}</div></div>`;
+ const you=me&&!tv?`<div class="card me"><div class="row" style="align-items:center"><div><div class="s">${esc(wl)}</div><div class="lbv">You're #${me.rank} of ${B.rows.length}</div><div class="s" style="color:var(--tx);margin-top:2px">${me.rank===1?(B.rows.length>1?'In the lead by '+$(me.rev-B.rows[1].rev):'In the lead'):$(me.gap)+' behind '+esc(lbFirst(me.above.name))+' for #'+(me.rank-1)}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${me.streak?`<span class="badge o">🔥 ${me.streak}-day calling streak</span>`:''}${me.fiveDays?`<span class="badge">📞 5-call day ×${me.fiveDays}</span>`:''}${X.first&&X.first.d.owner===MYID?'<span class="badge o">🥇 First close of the month</span>':''}</div></div></div>`:'';
+ const rows=B.rows.map(r=>`<div class="card lbr${r.rank===1&&r.rev?' one':''}${r.id===MYID?' me':''}"><span class="rk">#${r.rank}</span><div style="min-width:0"><div class="row" style="align-items:baseline"><div><div class="t">${esc(r.name)}</div><div class="s">${r.rank===1?(r.rev?'Leading':'—'):$(r.gap)+' behind #'+(r.rank-1)}${r.streak>1?' • 🔥 '+r.streak+'-day streak':''}</div></div><div class="lbv">${$(r.rev)}</div></div><div class="bar"><i class="${r.rank===1?'y':''}" style="width:${r.rev?Math.max(3,r.rev/top*100):0}%"></i></div><div class="lbs"><span><b>${r.won}</b> won</span><span><b>${r.calls}</b> calls</span><span><b>${r.mtgs}</b> meetings</span><span><b>${r.leads}</b> new leads</span><span><b style="color:var(--ok)">${$(r.comm)}</b> commission</span></div></div></div>`).join('')||'<div class="card s">Nobody is on the board yet.</div>';
+ const ml=X.month.rows[0],mon=now.toLocaleDateString(undefined,{month:'long'});
+ const contest=`<div class="card"><div class="t" style="color:var(--gold)">${esc(mon)} contest</div><div class="lbv" style="margin:4px 0">Most closed revenue wins ${S.cfg.contestPrize?esc(S.cfg.contestPrize):'a prize'}</div><div class="s">${ml&&ml.rev?'Leading: <b style="color:var(--tx)">'+esc(ml.name)+'</b> ('+$(ml.rev)+') • ':''}${X.daysLeft} day${X.daysLeft===1?'':'s'} left</div>${IS_ADMIN&&!tv?'<div class="acts"><button class="b2" data-a="lbPrize">✏️ Set prize</button><button class="b2" data-a="lbRate">✏️ Commission ('+pct+'%)</button></div>':''}</div>`;
+ const ico={win:'🏆',first:'🥇',five:'📞'};
+ const feed=`<div class="card"><div class="t">Latest</div>${X.feed.map(f=>`<div class="s" style="color:var(--tx);margin-top:8px">${ico[f.kind]} <b>${esc(f.text)}</b>${f.amount?' · '+$(f.amount):''}<br><span style="color:var(--mut)">${esc(uName(f.who))} · ${esc(timeAgo(+f.at))}</span></div>`).join('')||'<p class="s" style="margin-top:6px">Wins, first closes and 5-call days from the last two weeks show up here.</p>'}</div>`;
+ const foot=`<p class="s" style="margin-top:4px">Revenue is each won deal's amount, counted on the day it was won. Calls and meetings are completed Call and Meeting items on the Calendar. Commission at ${pct}%.</p>`;
+ return head+you+`<div class="lbg"><div>${rows}<p class="s">Team total, ${esc(wl.toLowerCase())}: <b style="color:var(--tx)">${$(B.total)}</b></p></div><div>${contest}${feed}</div></div>`+(IS_ADMIN&&!tv?lbManager(now):'')+(tv?'':foot)}
+function lbManager(now){const P=LB.profiles(S,now);if(!P.rows.length)return'';
+ if(!P.rows.some(r=>r.id===lbRep))lbRep=P.rows[0].id;const r=P.rows.find(x=>x.id===lbRep),T=LB.trend(S,lbRep,now,8);
+ const tagCls={'Grinding and closing':'o','Grinding, not closing':'r'}[r.tag]||'';
+ const tips={'Grinding and closing':'Busy and closing. Find out what is working and share it with the team.','Grinding, not closing':'Above-average calling but below-average revenue. Look at where their deals stall.','Closing without grinding':'Closing well on fewer calls. Check the pipeline is being refilled.','Low on both':'Below the team average on calls and revenue this quarter.','No activity yet':'No closes, calls or meetings logged this quarter.'};
+ const out=new Set(S.cfg.lbOut||[]);
+ return`<h3 style="margin:18px 0 8px">Manager view · this quarter</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${P.rows.map(x=>`<button class="${x.id===lbRep?'':'b2'}" data-a="lbRep" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+ <div class="g2"><div class="card"><div class="row"><div class="t">${esc(r.name)}: last 8 weeks</div><div class="s"><span style="color:var(--cyan)">━</span> revenue <span style="color:#3b6aa3">█</span> calls</div></div>${lbTrendSvg(T)}</div>
+ <div class="card"><span class="badge ${tagCls}">${esc(r.tag)}</span><p class="s" style="color:var(--tx);margin:8px 0">${esc(tips[r.tag])}</p><div class="lbs"><span>Calls per close <b>${r.cpc==null?'—':Math.round(r.cpc)}</b></span><span>Revenue per call <b>${r.rpc==null?'—':$(r.rpc)}</b></span><span>Team avg calls <b>${Math.round(P.avgC)}</b></span><span>Team avg revenue <b>${$(P.avgR)}</b></span></div></div></div>
+ <div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:520px"><tr class="s" style="text-align:right"><th style="text-align:left;padding:6px">Rep</th><th style="padding:6px">Revenue</th><th style="padding:6px">Won</th><th style="padding:6px">Calls</th><th style="padding:6px">Meetings</th><th style="padding:6px">Calls/close</th><th style="text-align:left;padding:6px">Pattern</th></tr>${P.rows.map(x=>`<tr style="text-align:right;border-top:1px solid var(--bd)"><td style="text-align:left;padding:6px">${esc(x.name)}</td><td style="padding:6px">${$(x.rev)}</td><td style="padding:6px">${x.won}</td><td style="padding:6px">${x.calls}</td><td style="padding:6px">${x.mtgs}</td><td style="padding:6px">${x.cpc==null?'—':Math.round(x.cpc)}</td><td style="text-align:left;padding:6px">${esc(x.tag)}</td></tr>`).join('')}</table></div>
+ <div class="card"><div class="t">Who's on the board</div><p class="s" style="margin:4px 0 8px">Untick anyone who shouldn't be ranked (for example, owners who don't sell).</p><div class="chk">${S.users.map(u=>`<label><input type="checkbox" data-c="lbOut" data-id="${u.id}" ${out.has(u.id)?'':'checked'}>${esc(u.name)}</label>`).join('')}</div></div>`}
+Object.assign(A,{
+ lbWin(id){lbWin=id;render()},lbRep(id){lbRep=id;render()},
+ lbTv(){const h=document.documentElement,on=!h.classList.contains('tv');h.classList.toggle('tv',on);if(on){h.requestFullscreen?.().catch(()=>{})}else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});render();scrollTo(0,0)},
+ lbLog(){form('Log a call or meeting',[{k:'type',l:'Type',t:'sel',o:['Call','Meeting']},{k:'client',l:'With (lead / client)'},{k:'owner',l:'Rep',t:'sel',o:owners(),dis:isStaff()},{k:'dt',l:'When',t:'datetime-local'}],{type:'Call',owner:MYID,dt:lbNowLocal()},o=>{if(!o.dt)return alert('Date required')&&false;if(isStaff())o.owner=MYID;S.acts.unshift({id:uid(),...o,title:o.type+(o.client?' — '+o.client:''),client:o.client||'General',pri:'Normal',done:true});save('acts')})},
+ lbPrize(){const v=prompt("Prize for this month's contest (most closed revenue):",S.cfg.contestPrize||'');if(v!==null){S.cfg.contestPrize=v.trim();save('cfg')}},
+ lbRate(){const v=prompt('Commission rate, as a percent of closed revenue:',S.cfg.commission??15);if(v===null)return;const n=Number(v);if(!(n>=0&&n<=100))return alert('Enter a number from 0 to 100.');S.cfg.commission=n;save('cfg')}
+});
 function vIns(){const AC=S.accts.filter(a=>a.status!=='Churned'),mrr=AC.reduce((t,a)=>t+(Number(a.retainer)||0),0),now=Date.now();
  const touch=a=>Math.max(0,...S.log.filter(l=>l.ref==='C'+a.id).map(l=>+new Date(l.at)),...S.acts.filter(x=>x.client===a.name).map(x=>+new Date(x.dt)).filter(t=>t<=now),...S.deliv.filter(d=>d.acct===a.id&&d.done).map(d=>+new Date(d.doneAt||0)),a.created?+new Date(a.created):0);
  const risk=AC.filter(a=>now-touch(a)>2592e6),ren=AC.filter(a=>a.renewal&&new Date(a.renewal)-now<5184e6&&new Date(a.renewal)-now>-864e5).sort((a,b)=>a.renewal<b.renewal?-1:1);
@@ -1071,6 +1116,7 @@ document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(t.id===
  if(c==='ldisp'){const l=S.leads.find(l=>l.id===id);l.disposition=t.value;logEv('L'+id,'Status → '+t.value);autoFollowUpOnProposal(l);save('leads','tasks')}if(c==='ulevel'){S.users.find(u=>u.id===id).level=t.value;save('users');(async()=>{try{await api('/api/accounts/admin',{method:'PATCH',body:JSON.stringify({userId:id,isAdmin:t.value==='admin'})});if(t.value==='admin')alert('If they already have a login, they need to sign out and back in to see admin controls.')}catch(e){}})()}if(c==='titem'){const k=S.tasks.find(x=>x.id===id),i=k.items.find(x=>x.id===t.dataset.s);i.done=t.checked;save('tasks')}if(c==='pstat'){S.props.find(x=>x.id===id).status=t.value;save('props')}
  if(c==='lown'){if(isStaff())return render();S.leads.find(l=>l.id===id).owner=t.value;save('leads')}
  if(c==='lpsz'){leadPageSz=+t.value;leadPage=0;try{localStorage.setItem('scgLeadPageSz',leadPageSz)}catch(e){}return render()}
+ if(c==='lbOut'){const o=new Set(S.cfg.lbOut||[]);t.checked?o.delete(id):o.add(id);S.cfg.lbOut=[...o];save('cfg')}
  if(c==='step')A.step(id,t)});
 document.addEventListener('input',e=>{const c=e.target.dataset.c;
  const SEARCH={lq:'_lq',cq:'_cq',dq:'_dq',clq:'_clq',iq:'_iq',tq:'_tq',ctq:'_ctq'};

@@ -16,7 +16,7 @@ Node 18+, Express 4, `pg`, JWT logins (`bcryptjs`), MCP SDK + `zod` for the AI c
 npm install
 DATABASE_URL=postgres://... JWT_SECRET=dev npm start     # tables are created on boot
 npm run seed                                              # once, prints 3 starter logins
-node --test test/reporting.test.js test/connect.test.js  # no database needed
+node --test test/reporting.test.js test/connect.test.js test/leaderboard.test.js  # no database needed
 MCP_TEST_DATABASE_URL=postgres://... node --test test/mcp.test.js   # WIPES that database
 ```
 
@@ -36,6 +36,8 @@ There is no `npm test` script. Never point `MCP_TEST_DATABASE_URL` at the real N
 | `src/google.js`, `src/docusign.js`, `src/ics.js` | Gmail send and Google Calendar, DocuSign envelopes, iCal feed parsing |
 | `src/push.js` | Android push through Firebase (`FCM_SERVICE_ACCOUNT_JSON`) |
 | `src/reporting.js` | Read-only reporting API for SCG Insights |
+| `src/wonAt.js` | Stamps `deal.wonAt` on every save when a deal enters the won stage |
+| `public/leaderboard.js` | Leaderboard math (ranks, windows, streaks, badges, manager trends), shared by the 🏆 tab and its tests |
 | `public/index.html` | The whole CRM UI (~1,100 lines) |
 | `public/insights/` | SCG Insights, a small analytics sub-app served at `/insights` |
 | `public/native.js` | Glue that only runs inside the mobile shell |
@@ -50,6 +52,7 @@ There is no `npm test` script. Never point `MCP_TEST_DATABASE_URL` at the real N
 - Because browsers save whole sections from a possibly stale copy, `keepRecentAiEdits` and `keepRecentTransfers` protect connector and Lead Finder writes for 15 minutes. Records written by the connector carry `aiAt` (and `aiNew`). Keep those guards working if you touch the save path.
 - Stage convention used everywhere: the **second-to-last** entry of `cfg.stages` is "won", the **last** is "lost". Don't match on the literal names, teams can rename them.
 - Default data lives in two places, `defaultData()` in `src/db.js` and `DEF()` in `public/index.html`. Change both.
+- `deal.wonAt` is when a deal entered the won stage, set by the page, the connector and `stampWonAt` on save. Deals won before it existed have none; the leaderboard falls back to the client record's `created` date.
 - Schema changes are additive and run on boot (`ADD COLUMN IF NOT EXISTS`, or a small idempotent migration like `ensureNotInterestedDisp`).
 
 ## Connector rules (`src/mcp.js`)

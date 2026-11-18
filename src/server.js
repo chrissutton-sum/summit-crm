@@ -15,6 +15,7 @@ const oauth = require('./oauth');
 const mcp = require('./mcp');
 const push = require('./push');
 const { keepRecentAiEdits } = require('./crmStore');
+const { stampWonAt } = require('./wonAt');
 
 const app = express();
 // Render sits behind a proxy; needed for correct client IPs and https URLs
@@ -129,6 +130,7 @@ app.put('/api/data', requireAuth, async (req, res) => {
     const { rows } = await client.query('SELECT data FROM crm_data WHERE id = 1 FOR UPDATE');
     keepRecentTransfers(rows[0]?.data, data);
     keepRecentAiEdits(rows[0]?.data, data);
+    stampWonAt(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
     connect.announceWins(rows[0]?.data, data);

@@ -154,6 +154,8 @@ function applyDeal(data, ctx, d, a, isNew) {
     if (a.loss_reason) d.lossReason = a.loss_reason;
     if (!d.lossReason) fail(`Moving a deal to ${LOST(data)} needs a loss_reason (price, timing, competitor, no response, other).`);
   } else delete d.lossReason;
+  // Same as stampWonAt on browser saves: when the deal entered the won stage, for the leaderboard
+  if (d.stage === WON(data)) { if ((isNew || d.lastStage) && d.lastStage !== d.stage && !d.wonAt) d.wonAt = now() } else delete d.wonAt;
   if (d.lastStage !== d.stage) {
     if (d.lastStage && !isNew) logEv(data, ctx, 'D' + d.id, 'Stage → ' + d.stage);
     d.lastStage = d.stage;
