@@ -156,15 +156,19 @@ app.put('/api/data', requireAuth, async (req, res) => {
 function keepParty(before, after) {
   if (before && before.party) after.party = before.party; else delete after.party;
 }
-app.post('/api/party', requireAuth, requireAdmin, async (req, res) => {
+// Allowed for anyone set to "Admin" (not "Staff") in Settings → Team, the same
+// Admin/Staff level the rest of the CRM screen goes by.
+app.post('/api/party', requireAuth, async (req, res) => {
   const msg = String(req.body?.msg || '').trim().slice(0, 120);
   const style = ['confetti', 'stars', 'fireworks', 'money', 'trophies'].includes(req.body?.style) ? req.body.style : 'confetti';
-  let party;
+  let party, denied = false;
   await mutateData(d => {
     const me = (d.users || []).find(u => u.id === req.account.userId);
+    if (!req.account.isAdmin && (!me || me.level === 'staff')) { denied = true; return; }
     party = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), by: me?.name || req.account.username || 'An admin', msg, style };
     d.party = party;
   });
+  if (denied) return res.status(403).json({ error: 'Admin only' });
   if (!party) return res.status(500).json({ error: 'Could not start the confetti' });
   res.json(party);
 });

@@ -412,7 +412,7 @@ function render(){if(typeof slackNotify==='function')A.flagOverdue&&A.flagOverdu
  // just hidden, so it's obvious why (not missing).
  if(isStaff()){w.innerHTML=`<option value="${MYID}">${esc(ME()?.name||'Me')}</option>`;w.value=MYID;w.disabled=true;w.title="Staff can only view their own records."}
  else{w.innerHTML=`<option value="ALL">👥 All users</option>`+S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');w.value=S.users.some(u=>u.id===cur)?cur:'ALL';w.disabled=false;w.title=''}
- el('scgInsightsLink').style.display=IS_ADMIN?'inline-block':'none';el('partyBtn').style.display=IS_ADMIN?'':'none';
+ el('scgInsightsLink').style.display=IS_ADMIN?'inline-block':'none';el('partyBtn').style.display=!isStaff()?'':'none';
  // Keep the reporting launch inside the Android WebView to reuse its CRM session.
  if(window.Capacitor?.isNativePlatform?.())el('scgInsightsLink').target='_self';
  if(hidden(tab))tab='dash';el('nav').innerHTML=TABS.filter(t=>!hidden(t[0])).map(t=>`<div class="${t[0]===tab?'on':''}" data-a="tab" data-id="${t[0]}"><span>${t[1]}</span>${t[2]}</div>`).join('');
@@ -711,7 +711,7 @@ const A={
   const{items:Lp}=paginate(L,leadPage,leadPageSz);const allSel=Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
   Lp.forEach(l=>allSel?selectedLeads.delete(l.id):selectedLeads.add(l.id));render()},
  clearLeadSelection(){selectedLeads.clear();render()},
- party(){if(!IS_ADMIN)return;openModal(`<h3>🎉 Make it rain</h3><p class="s" style="margin-bottom:10px">Confetti on every open CRM (phone app included) within about 10 seconds.</p><label>Effect</label><div id="partyStyle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${PARTY_STYLES.map(([k,l],i)=>`<button type="button" class="${i?'b2':''}" data-k="${k}">${l}</button>`).join('')}</div><button type="button" class="b2" id="partyPreview" style="margin-bottom:10px">👀 Preview on my screen only</button><label>Message (optional)</label><input id="partyMsg" maxlength="120" placeholder="e.g. Record month, team!"><div class="row" style="margin-top:12px"><button id="partyGo" style="flex:1">🎉 Make it rain</button><button class="b2" data-a="close">Cancel</button></div>`);
+ party(){if(isStaff())return;openModal(`<h3>🎉 Make it rain</h3><p class="s" style="margin-bottom:10px">Confetti on every open CRM (phone app included) within about 10 seconds.</p><label>Effect</label><div id="partyStyle" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${PARTY_STYLES.map(([k,l],i)=>`<button type="button" class="${i?'b2':''}" data-k="${k}">${l}</button>`).join('')}</div><button type="button" class="b2" id="partyPreview" style="margin-bottom:10px">👀 Preview on my screen only</button><label>Message (optional)</label><input id="partyMsg" maxlength="120" placeholder="e.g. Record month, team!"><div class="row" style="margin-top:12px"><button id="partyGo" style="flex:1">🎉 Make it rain</button><button class="b2" data-a="close">Cancel</button></div>`);
   let style='confetti';el('partyStyle').querySelectorAll('button').forEach(b=>b.onclick=()=>{style=b.dataset.k;el('partyStyle').querySelectorAll('button').forEach(o=>o.className=o===b?'':'b2')});
   el('partyPreview').onclick=()=>confetti(style);
   const go=async()=>{el('partyGo').disabled=true;try{const r=await api('/api/party',{method:'POST',body:JSON.stringify({msg:el('partyMsg').value,style})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start the confetti');S.party=d;closeM();celebrateWins()}catch(e){alert(e.message);el('partyGo').disabled=false}};
@@ -790,10 +790,10 @@ const A={
  async createLogin(id){const u=S.users.find(x=>x.id===id);if(!u)return;
   const username=(prompt('Username for '+u.name+':',u.name.toLowerCase().replace(/[^a-z0-9]/g,''))||'').trim();if(!username)return;
   const password=prompt('Temporary password (min 8 characters) — share this with '+u.name+', they can change it from Settings:')||'';if(password.length<8)return alert('Password must be at least 8 characters.');
-  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id,isAdmin:u.level==='admin'})});const d=await r.json();
+  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({username,password,userId:id,isAdmin:u.level!=='staff'})});const d=await r.json();
    if(!r.ok)return alert(d.error||'Could not create login.');
    await refreshAccountsStatus();render();
-   alert('Login created. Username: '+username+'  Password: '+password+(u.level==='admin'?'\n\nThey\'ll see admin controls once they sign in.':''))}catch(e){alert('Could not reach the server.')}},
+   alert('Login created. Username: '+username+'  Password: '+password+(u.level!=='staff'?'\n\nThey\'ll see admin controls once they sign in.':''))}catch(e){alert('Could not reach the server.')}},
  async changePw(){const oldPassword=el('pwOld').value,newPassword=el('pwNew').value;el('pwErr').textContent='';
   if(!oldPassword||newPassword.length<8){el('pwErr').textContent='Enter your current password and a new one of at least 8 characters.';return}
   try{const r=await api('/api/me/password',{method:'POST',body:JSON.stringify({oldPassword,newPassword})});const d=await r.json();
