@@ -184,6 +184,16 @@ test('staff logins cannot reassign leads', { skip }, async () => {
   assert.match((await call(t, 'update_lead', { id: 'old1', owner: 'Jordan' })).error, /Staff/);
 });
 
+test('staff logins can see every lead but only change their own', { skip }, async () => {
+  const { access_token: t } = await connect('jordan');
+  const seen = await call(t, 'get_lead', { id: 'old1' });
+  assert.ok(seen.data, 'staff can read someone else\'s lead');
+  assert.match((await call(t, 'update_lead', { id: 'old1', status: 'Contacted' })).error, /only change their own/);
+  assert.match((await call(t, 'add_note', { record_type: 'lead', record_id: 'old1', text: 'hi' })).error, /only add notes to their own/);
+  const mine = await call(t, 'create_lead', { company: 'Meridian Movers' });
+  assert.ok((await call(t, 'add_note', { record_type: 'lead', record_id: mine.data.id, text: 'called' })).data);
+});
+
 test('a stale browser save does not wipe out AI edits', { skip }, async () => {
   const { access_token: t } = await connect('alex');
   const browserToken = jwt.sign({ accountId: 1, username: 'alex', userId: 'u1', isAdmin: true }, SECRET);

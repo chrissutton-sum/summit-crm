@@ -305,6 +305,8 @@ function buildServer(ctx) {
     inputSchema: { id: z.string(), ...leadInput }, annotations: WRITE,
   }, async a => write(data => {
     const lead = find(data, 'leads', a.id, 'lead');
+    // Same rule as the app: staff can see every lead but only change their own.
+    if (ctx.isStaff && lead.owner !== ctx.userId) fail(`That lead belongs to ${userName(data, lead.owner)}. Staff logins can only change their own leads.`);
     const f = leadFields(data, ctx, a, lead);
     if (f.company === '') fail('Company can’t be blank');
     const before = lead.disposition;
@@ -450,6 +452,7 @@ function buildServer(ctx) {
   }, async ({ record_type, record_id, text }) => write(data => {
     const t = TYPES[record_type];
     const rec = find(data, t.key, record_id, record_type);
+    if (record_type === 'lead' && ctx.isStaff && rec.owner !== ctx.userId) fail(`That lead belongs to ${userName(data, rec.owner)}. Staff logins can only add notes to their own leads.`);
     logEv(data, ctx, t.prefix + record_id, '📝 ' + text.trim());
     stamp(rec); // so an open browser tab doesn't hide the new note behind a stale copy
     audit(data, ctx, `Added a note to ${record_type} ${rec.company || rec.name}`);
