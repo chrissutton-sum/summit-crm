@@ -193,7 +193,10 @@ async function doPush(){
    }
    if(picked){const a=document.activeElement,tag=a&&a.tagName;if(tag!=='INPUT'&&tag!=='TEXTAREA')render()}
   }catch(e){}
-  await api('/api/data',{method:'PUT',body:JSON.stringify(S)});
+  // A refused save (e.g. 413 too large, 500) must count as a failure, not
+  // success, or the edit is dropped and the next sync quietly undoes it.
+  const pr=await api('/api/data',{method:'PUT',body:JSON.stringify(S)});
+  if(!pr.ok)throw new Error('Save refused ('+pr.status+')');
   ks.forEach(k=>pendingKeys.delete(k));
   pushing=false;pushFailStreak=0;
   el('sync').textContent='● shared';

@@ -24,7 +24,10 @@ const app = express();
 // Render sits behind a proxy; needed for correct client IPs and https URLs
 app.set('trust proxy', 1);
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+// The whole CRM is saved as one document on every change, and with ~5,000
+// leads it passed the old 5 MB cap on 2026-11-19 (every save was refused).
+// 25 MB leaves years of headroom at the current growth rate.
+app.use(express.json({ limit: '25mb' }));
 
 const PORT = process.env.PORT || 3000;
 
@@ -138,6 +141,8 @@ app.put('/api/data', requireAuth, async (req, res) => {
     keepParty(rows[0]?.data, data);
     await client.query('UPDATE crm_data SET data = $1, updated_at = now() WHERE id = 1', [data]);
     await client.query('COMMIT');
+    const mb = Number(req.get('content-length') || 0) / 1048576;
+    if (mb > 15) console.warn(`[save] CRM document is ${mb.toFixed(1)} MB; the save limit is 25 MB`);
     connect.announceWins(rows[0]?.data, data);
     push.notifyChanges(rows[0]?.data, data);
   } catch (e) {
