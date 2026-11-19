@@ -578,7 +578,7 @@ function vLeads(){
  const canBulk=!isStaff(),allSelOnPage=canBulk&&Lp.length&&Lp.every(l=>selectedLeads.has(l.id));
  const filterLabel=leadFilter==='stale'?`<span class="t" style="align-self:center;color:#f87171">⚠ Stale leads (no activity in ${STALE_MS/864e5}+ days)</span>`:leadFilter==='sla'?`<span class="t" style="align-self:center;color:#f87171">⏰ SLA overdue (no first response within ${SLA_HOURS}h)</span>`:`<span class="t" style="align-self:center">📁 ${esc(leadFolder)} <span class="s">(${L.length.toLocaleString()})</span></span>`;
  return head+`<div class="row" style="margin:-2px 0 10px;flex-wrap:wrap;gap:6px"><div>${backBtn}${!q?filterLabel:''}</div>${Lp.length?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><label class="s" style="display:flex;gap:6px;align-items:center;margin:0;text-transform:none">Show<select data-c="lpsz" style="width:auto;margin:0;padding:4px 8px">${LEAD_PAGE_SIZES.map(n=>`<option ${n===leadPageSz?'selected':''}>${n}</option>`).join('')}</select>per page</label><button class="b2" data-a="expandAllLeads">Expand all</button> <button class="b2" data-a="collapseAllLeads">Collapse all</button></div>`:''}</div>`
- +(canBulk&&Lp.length?`<div class="row" style="margin:-4px 0 10px;flex-wrap:wrap;gap:8px;align-items:center"><button class="b2" data-a="selectAllLeads">${allSelOnPage?'☑ Deselect all on this page':'☐ Select all on this page'}</button>${selectedLeads.size?`<span class="s">${selectedLeads.size} selected</span><button class="bg" data-a="bulkReassignLeads">👤 Reassign owner</button><button class="b2" data-a="clearLeadSelection">Clear</button>`:''}</div>`:'')
+ +(canBulk&&Lp.length?`<div class="row" style="margin:-4px 0 10px;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-start"><button class="b2" data-a="selectAllLeads">${allSelOnPage?'☑ Deselect all on this page':'☐ Select all on this page'}</button>${selectedLeads.size?`<span class="s">${selectedLeads.size} selected</span><button class="bg" data-a="bulkReassignLeads">👤 Reassign owner</button><button class="bg" data-a="bulkLeadField" data-id="disposition">🏷️ Change status</button><button class="bg" data-a="bulkLeadField" data-id="source">📥 Change lead source</button><button class="b2" data-a="clearLeadSelection">Clear</button>`:''}</div>`:'')
  +(Lp.map(l=>{const open=openLeads.has(l.id),cw=canWorkLead(l);
  const noteCount=l.noteLog?.length||0;
  const leadTasks=S.tasks.filter(k=>k.ref==='L'+l.id),openTaskCount=leadTasks.filter(k=>!k.done).length;
@@ -745,6 +745,16 @@ const A={
   dupClusters.length?openModal(renderDupModal()):closeM()},
  bulkReassignLeads(){if(isStaff()||!selectedLeads.size)return;
   openModal(`<h3>Reassign ${selectedLeads.size} lead${selectedLeads.size===1?'':'s'}</h3><p class="s" style="margin-bottom:8px">Every selected lead will be reassigned to the owner you pick below.</p><label>New owner</label><select id="bulkOwnerSel">${owners().map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select><div class="acts np"><button data-a="confirmBulkReassign">Reassign</button><button class="b2" data-a="close">Cancel</button></div>`)},
+ // Mass status / lead-source change for the selected leads (same admin-only
+ // selection as Reassign). Status changes log to each lead's history, unless
+ // it's a big batch, which would push older activity out of the shared log.
+ bulkLeadField(k){if(isStaff()||!selectedLeads.size)return;const n=selectedLeads.size,isSt=k==='disposition',opts=isSt?S.cfg.disps:SOURCES;
+  openModal(`<h3>${isSt?'Change status':'Change lead source'} for ${n} lead${n===1?'':'s'}</h3><p class="s" style="margin-bottom:8px">Every selected lead gets the ${isSt?'status':'lead source'} you pick below.</p><label>New ${isSt?'status':'lead source'}</label><select id="bulkFieldSel">${opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select><div class="acts np"><button data-a="confirmBulkLeadField" data-id="${k}">Apply to ${n} lead${n===1?'':'s'}</button><button class="b2" data-a="close">Cancel</button></div>`)},
+ confirmBulkLeadField(k){const sel=el('bulkFieldSel');if(!sel||!['disposition','source'].includes(k))return;const v=sel.value,ids=[...selectedLeads],n=ids.length,isSt=k==='disposition';let changed=0;
+  ids.forEach(id=>{const l=S.leads.find(x=>x.id===id);if(!l||l[k]===v)return;l[k]=v;changed++;
+   if(isSt){if(n<=50)logEv('L'+id,'Status → '+v);autoFollowUpOnProposal(l)}});
+  aud((isSt?'Changed status':'Changed lead source')+' of '+changed+' lead'+(changed===1?'':'s')+' to '+v);
+  selectedLeads.clear();save('leads','tasks','log');closeM()},
  confirmBulkReassign(){const sel=el('bulkOwnerSel');if(!sel)return;const newOwner=sel.value,ids=[...selectedLeads],n=ids.length;
   ids.forEach(id=>{const l=S.leads.find(x=>x.id===id);if(l)l.owner=newOwner});
   aud('Reassigned '+n+' lead'+(n===1?'':'s')+' to '+uName(newOwner));
