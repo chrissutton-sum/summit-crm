@@ -233,7 +233,11 @@ test('a stale browser save does not wipe out AI edits', { skip }, async () => {
 });
 
 test('Gemini can register; its refresh token is kept and extended, not rotated', { skip }, async () => {
+  // Gemini registers its sandbox and test relays alongside the live one
   const G = 'https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-test';
+  const all = ['oauth-redirect-sandbox', 'oauth-redirect-test', 'oauth-redirect'].flatMap(h => ['r', 'a'].map(k => `https://${h}.googleusercontent.com/${k}/user_bound_custom-mcp-test`));
+  const multi = await fetch(`${BASE}/oauth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_name: 'Google', redirect_uris: all, token_endpoint_auth_method: 'client_secret_post' }) });
+  assert.equal(multi.status, 201, 'Gemini-style registration accepted');
   const s = await connect('alex', PW, G);
   assert.ok(s.access_token, 'Gemini redirect accepted');
   const refresh = () => fetch(`${BASE}/oauth/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: s.refresh_token, client_id: s.client_id }) }).then(r => r.json());

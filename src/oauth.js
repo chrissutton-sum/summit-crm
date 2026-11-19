@@ -21,11 +21,13 @@ const pwVersion = hash => sha(hash).slice(0, 16);
 // Only these apps can receive sign-in codes, so a look-alike connector can't
 // trick someone into handing over CRM access.
 // MCP_REDIRECT_HOSTS adds hosts to the built-in list (it can't remove them).
-// oauth-redirect.googleusercontent.com is the Gemini app's sign-in relay.
-const GEMINI_HOST = 'oauth-redirect.googleusercontent.com';
-const REDIRECT_HOSTS = [...new Set(['claude.ai', 'claude.com', 'chatgpt.com', 'platform.openai.com', GEMINI_HOST,
+// The oauth-redirect*.googleusercontent.com hosts are Google's sign-in relay
+// for Gemini. Gemini registers all three (live, sandbox, test) at once, and
+// registration needs every address allowed, so all three are listed.
+const GEMINI_HOSTS = ['oauth-redirect.googleusercontent.com', 'oauth-redirect-sandbox.googleusercontent.com', 'oauth-redirect-test.googleusercontent.com'];
+const REDIRECT_HOSTS = [...new Set(['claude.ai', 'claude.com', 'chatgpt.com', 'platform.openai.com', ...GEMINI_HOSTS,
   ...(process.env.MCP_REDIRECT_HOSTS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)])];
-const isGemini = client => { try { return new URL(client.redirect_uris[0]).hostname === GEMINI_HOST; } catch { return false; } };
+const isGemini = client => { try { return GEMINI_HOSTS.includes(new URL(client.redirect_uris[0]).hostname); } catch { return false; } };
 
 function redirectAllowed(uri) {
   try {
@@ -126,7 +128,7 @@ function appLabel(client) {
   const host = (() => { try { return new URL(client.redirect_uris[0]).hostname; } catch { return ''; } })();
   if (/claude\.(ai|com)$/.test(host)) return 'Claude';
   if (/(chatgpt\.com|openai\.com)$/.test(host)) return 'ChatGPT';
-  if (host === GEMINI_HOST) return 'Gemini';
+  if (GEMINI_HOSTS.includes(host)) return 'Gemini';
   return client.client_name || 'An AI app';
 }
 
