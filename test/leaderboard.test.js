@@ -105,3 +105,15 @@ test('commission defaults to 12% when no rate is set', () => {
   const S = { cfg, users: [{ id: 'u', name: 'U' }], deals: [{ id: 'd', owner: 'u', stage: 'Won', amount: 1000, wonAt: at(10, 17) }] };
   assert.equal(LB.board(S, 'month', now).rows[0].comm, 120);
 });
+
+test('new leads count however they were added: CRM page, Lead Finder or the connector', () => {
+  const S = { cfg, users: [{ id: 'sam', name: 'Sam' }], leads: [
+    { owner: 'sam', createdAt: at(10, 16) },
+    { owner: 'sam', lfAddedAt: at(10, 16) },
+    { owner: 'sam', addedAt: at(10, 16) },
+    { owner: 'sam', aiNew: true, aiAt: at(10, 16) },
+    { owner: 'sam', aiAt: at(10, 16) },          // edited by the connector, not added by it
+    { owner: 'sam' },                            // no date at all
+  ] };
+  assert.equal(LB.board(S, 'month', now).rows[0].leads, 4);
+});

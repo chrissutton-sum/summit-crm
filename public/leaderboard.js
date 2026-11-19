@@ -37,6 +37,12 @@ function wonDate(S, d) {
   return d.close ? new Date(d.close + 'T12:00') : null;
 }
 
+// When a lead was added. createdAt is set by the CRM page, but it also starts the
+// 4-hour response timer and its push alerts, so Lead Finder (lfAddedAt) and the
+// connector (addedAt) record their own. Connector leads from before addedAt
+// existed fall back to their last connector edit (aiAt), usually the day added.
+const leadAt = l => l.createdAt || l.lfAddedAt || l.addedAt || (l.aiNew && l.aiAt) || null;
+
 const isCall = a => a.done && a.type === 'Call' && a.dt;
 const isMtg = a => a.done && a.type === 'Meeting' && a.dt;
 
@@ -46,7 +52,7 @@ function tally(S, from, to) {
   const inW = d => d && !isNaN(d) && d >= from && d < to;
   (S.deals || []).forEach(d => { if (inW(wonDate(S, d))) { const u = get(d.owner); u.rev += num(d.amount); u.won++ } });
   (S.acts || []).forEach(a => { const d = new Date(a.dt); if (isCall(a) && inW(d)) get(a.owner).calls++; if (isMtg(a) && inW(d)) get(a.owner).mtgs++ });
-  (S.leads || []).forEach(l => { if (l.createdAt && inW(new Date(l.createdAt))) get(l.owner).leads++ });
+  (S.leads || []).forEach(l => { const at = leadAt(l); if (at && inW(new Date(at))) get(l.owner).leads++ });
   return t;
 }
 
@@ -139,6 +145,6 @@ function profiles(S, now) {
   return { avgC, avgR, rows: b.rows.map(x => ({ ...x, tag: tag(x), cpc: x.won ? x.calls / x.won : null, rpc: x.calls ? x.rev / x.calls : null })) };
 }
 
-const LB = { WINDOWS, winStart, winEnd, wonDate, tally, callDays, streak, longestStreak, players, board, extras, trend, profiles, ymd, monthKey };
+const LB = { WINDOWS, winStart, winEnd, wonDate, leadAt, tally, callDays, streak, longestStreak, players, board, extras, trend, profiles, ymd, monthKey };
 if (typeof module !== 'undefined' && module.exports) module.exports = LB; else root.LB = LB;
 })(typeof window !== 'undefined' ? window : globalThis);

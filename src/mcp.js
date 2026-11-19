@@ -292,6 +292,7 @@ function buildServer(ctx) {
     const lead = stamp({
       id: uid(), company: '', contact: '', phone: '', email: '', source: 'Unknown',
       disposition: data.cfg?.disps?.[0] || 'New Lead', services: [], notes: '', owner: ctx.userId, ...f,
+      addedAt: now(), // for the leaderboard; not createdAt, which would start the response-timer alerts
     }, true);
     lead.value = Number(lead.value) || monthlyValue(data, lead.services);
     data.leads = [lead, ...(data.leads || [])];
