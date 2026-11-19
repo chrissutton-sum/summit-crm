@@ -67,15 +67,18 @@ Visit your Render URL, sign in with one of the seeded logins, and you're in.
 Edit files directly on GitHub (or push from a local clone) — Render redeploys
 automatically from the `main` branch.
 
-## Claude & ChatGPT connector
+## Claude, ChatGPT & Gemini connector
 
-The CRM has an MCP connector at `/mcp`, so Claude or ChatGPT can look up,
-add and edit leads, contacts, deals and notes by chatting. Settings → Claude
-& ChatGPT shows the address to paste in, and who's connected.
+The CRM has an MCP connector at `/mcp`, so Claude, ChatGPT or Gemini can look
+up, add and edit leads, contacts, deals and notes by chatting. Settings →
+Claude, ChatGPT & Gemini shows the address to paste in, and who's connected.
+In Gemini it's Settings → Connected Apps → Add a custom app (personal Google
+accounts only for now, not Workspace accounts).
 
 - **Sign-in:** OAuth with each person's normal CRM username/password. No API
-  keys. Only Claude and ChatGPT can receive sign-in codes
-  (`MCP_REDIRECT_HOSTS` changes that list).
+  keys. Only Claude, ChatGPT and Gemini can receive sign-in codes
+  (`MCP_REDIRECT_HOSTS` adds hosts to that list). Gemini's refresh token is
+  kept and extended rather than rotated, as Google asks.
 - **What it can do:** view/search/create/edit leads, contacts and deals, and
   add notes. No deletes, nothing in invoices, settings or team logins. Same
   rules as the app: staff logins can't reassign leads, Closed Lost needs a

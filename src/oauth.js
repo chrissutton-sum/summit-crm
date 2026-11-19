@@ -1,4 +1,4 @@
-// OAuth 2.1 sign-in for AI connectors (Claude, ChatGPT). They register
+// OAuth 2.1 sign-in for AI connectors (Claude, ChatGPT, Gemini). They register
 // themselves (dynamic client registration), send the person here to sign in
 // with their normal CRM username/password, and get a short-lived token that
 // only works on /mcp. Tokens are tied to the CRM login: deactivating the
@@ -20,8 +20,12 @@ const pwVersion = hash => sha(hash).slice(0, 16);
 
 // Only these apps can receive sign-in codes, so a look-alike connector can't
 // trick someone into handing over CRM access.
-const REDIRECT_HOSTS = (process.env.MCP_REDIRECT_HOSTS || 'claude.ai,claude.com,chatgpt.com,platform.openai.com')
-  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+// MCP_REDIRECT_HOSTS adds hosts to the built-in list (it can't remove them).
+// oauth-redirect.googleusercontent.com is the Gemini app's sign-in relay.
+const GEMINI_HOST = 'oauth-redirect.googleusercontent.com';
+const REDIRECT_HOSTS = [...new Set(['claude.ai', 'claude.com', 'chatgpt.com', 'platform.openai.com', GEMINI_HOST,
+  ...(process.env.MCP_REDIRECT_HOSTS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)])];
+const isGemini = client => { try { return new URL(client.redirect_uris[0]).hostname === GEMINI_HOST; } catch { return false; } };
 
 function redirectAllowed(uri) {
   try {
@@ -122,6 +126,7 @@ function appLabel(client) {
   const host = (() => { try { return new URL(client.redirect_uris[0]).hostname; } catch { return ''; } })();
   if (/claude\.(ai|com)$/.test(host)) return 'Claude';
   if (/(chatgpt\.com|openai\.com)$/.test(host)) return 'ChatGPT';
+  if (host === GEMINI_HOST) return 'Gemini';
   return client.client_name || 'An AI app';
 }
 
@@ -219,7 +224,7 @@ function mount(app) {
     const uris = Array.isArray(b.redirect_uris) ? b.redirect_uris.map(String) : [];
     console.log(`[connector] register "${String(b.client_name || '').slice(0, 60)}" redirect_uris=${JSON.stringify(uris)} auth=${b.token_endpoint_auth_method || 'none'}`);
     if (!uris.length || !uris.every(redirectAllowed)) {
-      return oauthError(res, 400, 'invalid_redirect_uri', 'Only Claude and ChatGPT can connect to this CRM.');
+      return oauthError(res, 400, 'invalid_redirect_uri', 'Only Claude, ChatGPT and Gemini can connect to this CRM.');
     }
     const method = ['client_secret_post', 'client_secret_basic'].includes(b.token_endpoint_auth_method) ? b.token_endpoint_auth_method : 'none';
     const clientId = rand();
@@ -290,6 +295,27 @@ function mount(app) {
       const { rows: [account] } = await pool.query('SELECT * FROM accounts WHERE id = $1', [code.account_id]);
       if (!account || account.active === false) return oauthError(res, 400, 'invalid_grant', 'Login is deactivated');
       return res.json(await issueTokens(client.client_id, account.id, pwVersion(account.password_hash)));
+    }
+
+    if (b.grant_type === 'refresh_token' && isGemini(client)) {
+      // Google asks for refresh tokens that stay the same and get extended,
+      // not rotated (it may keep using the one it has), so Gemini gets a new
+      // access token and the same refresh token with a fresh 60 days.
+      const { rows: [old] } = await pool.query(
+        `SELECT * FROM oauth_tokens WHERE token_hash = $1 AND kind = 'refresh'`, [sha(b.refresh_token || '')]);
+      if (!old || old.client_id !== client.client_id || old.expires_at < new Date()) return oauthError(res, 400, 'invalid_grant', 'Refresh token is invalid or expired');
+      const { rows: [account] } = await pool.query('SELECT * FROM accounts WHERE id = $1', [old.account_id]);
+      if (!account || account.active === false || pwVersion(account.password_hash) !== old.pw) {
+        await pool.query('DELETE FROM oauth_tokens WHERE grant_id = $1', [old.grant_id]);
+        return oauthError(res, 400, 'invalid_grant', 'Sign in again');
+      }
+      await pool.query(`DELETE FROM oauth_tokens WHERE grant_id = $1 AND kind = 'access'`, [old.grant_id]);
+      await pool.query(`UPDATE oauth_tokens SET expires_at = now() + make_interval(secs => $2) WHERE token_hash = $1`, [old.token_hash, REFRESH_TTL]);
+      const access = rand();
+      await pool.query(
+        `INSERT INTO oauth_tokens (token_hash, kind, grant_id, client_id, account_id, pw, expires_at) VALUES ($1, 'access', $2, $3, $4, $5, now() + make_interval(secs => $6))`,
+        [sha(access), old.grant_id, client.client_id, account.id, old.pw, ACCESS_TTL]);
+      return res.json({ access_token: access, token_type: 'Bearer', expires_in: ACCESS_TTL, refresh_token: b.refresh_token, scope: SCOPE });
     }
 
     if (b.grant_type === 'refresh_token') {

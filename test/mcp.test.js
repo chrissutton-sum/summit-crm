@@ -51,14 +51,14 @@ test.after(async () => {
 
 const skip = !DB && 'set MCP_TEST_DATABASE_URL to run';
 
-async function connect(username, password = PW) {
+async function connect(username, password = PW, redirect = REDIRECT) {
   const reg = await (await fetch(`${BASE}/oauth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_name: 'Test', redirect_uris: [REDIRECT] }),
+    body: JSON.stringify({ client_name: 'Test', redirect_uris: [redirect] }),
   })).json();
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  const params = { client_id: reg.client_id, redirect_uri: REDIRECT, response_type: 'code', state: 'xyz', code_challenge: challenge, code_challenge_method: 'S256' };
+  const params = { client_id: reg.client_id, redirect_uri: redirect, response_type: 'code', state: 'xyz', code_challenge: challenge, code_challenge_method: 'S256' };
   const page = await fetch(`${BASE}/oauth/authorize?${new URLSearchParams(params)}`);
   assert.equal(page.status, 200);
   const res = await fetch(`${BASE}/oauth/authorize`, {
@@ -70,7 +70,7 @@ async function connect(username, password = PW) {
   assert.equal(loc.searchParams.get('state'), 'xyz');
   const tok = await fetch(`${BASE}/oauth/token`, {
     method: 'POST',
-    body: new URLSearchParams({ grant_type: 'authorization_code', code: loc.searchParams.get('code'), redirect_uri: REDIRECT, client_id: reg.client_id, code_verifier: verifier }),
+    body: new URLSearchParams({ grant_type: 'authorization_code', code: loc.searchParams.get('code'), redirect_uri: redirect, client_id: reg.client_id, code_verifier: verifier }),
   });
   return { ...(await tok.json()), client_id: reg.client_id };
 }
@@ -230,6 +230,20 @@ test('a stale browser save does not wipe out AI edits', { skip }, async () => {
   fresh.leads.find(l => l.id === 'old1').contact = 'Dana Smith';
   await fetch(`${BASE}/api/data`, { method: 'PUT', headers: { Authorization: `Bearer ${browserToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(fresh) });
   assert.equal((await crm()).leads.find(l => l.id === 'old1').contact, 'Dana Smith');
+});
+
+test('Gemini can register; its refresh token is kept and extended, not rotated', { skip }, async () => {
+  const G = 'https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-test';
+  const s = await connect('alex', PW, G);
+  assert.ok(s.access_token, 'Gemini redirect accepted');
+  const refresh = () => fetch(`${BASE}/oauth/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: s.refresh_token, client_id: s.client_id }) }).then(r => r.json());
+  const a = await refresh(), b = await refresh();
+  assert.equal(a.refresh_token, s.refresh_token);
+  assert.equal(b.refresh_token, s.refresh_token, 'same refresh token works again');
+  assert.equal((await rpc(a.access_token, 'tools/list')).status, 401, 'older access token dropped');
+  assert.equal((await rpc(b.access_token, 'tools/list')).status, 200);
+  const bad = await fetch(`${BASE}/oauth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect_uris: ['https://evil.example.com/cb'] }) });
+  assert.equal(bad.status, 400);
 });
 
 test('refresh tokens rotate; deactivation and password changes cut access', { skip }, async () => {
