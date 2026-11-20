@@ -1134,7 +1134,11 @@ const EXP={
 const fileText=(f,cb)=>{const r=new FileReader();r.onload=()=>cb(String(r.result));r.readAsText(f)};
 Object.assign(A,{
  impOpen(){openModal(`<h3>⬆ Import from another CRM</h3><p class="s">Export a CSV from HubSpot, Salesforce, Pipedrive, Zoho, or any spreadsheet and choose it here. You review the column mapping before anything is imported.</p><label style="margin-top:10px">What are you importing?</label><select id="imt"><option value="leads">Leads / Contacts</option><option value="deals">Deals / Opportunities</option><option value="clients">Clients / Accounts</option></select><label>CSV file</label><input type="file" id="imf" accept=".csv,.tsv,.txt,text/csv"><label>…or paste CSV text</label><textarea id="imx" rows="4"></textarea><div class="acts"><button id="imn">Next: map columns</button><button class="b2" data-a="close">Cancel</button></div>`);
-  const go=t=>{const rows=parseCSV(t);if(rows.length<2)return alert('Could not find a header row plus data rows.');const H=rows[0].map(x=>x.trim()),R=rows.slice(1,2001),N=H.map(normH);
+  const go=t=>{const rows=parseCSV(t);if(rows.length<2)return alert('Could not find a header row plus data rows.');// Up to 20,000 rows per import (was a silent 2,000). Bigger files are cut
+   // with a warning, and re-importing the same file continues where it left
+   // off because rows already in the CRM are skipped as duplicates.
+   const MAXR=20000;if(rows.length-1>MAXR&&!confirm(`This file has ${(rows.length-1).toLocaleString()} rows. Only the first ${MAXR.toLocaleString()} can be imported at once.\n\nImport those now? (Run the import again with the same file later and the ones already in are skipped.)`))return;
+   const H=rows[0].map(x=>x.trim()),R=rows.slice(1,MAXR+1),N=H.map(normH);
    if(N.includes('firstname')&&N.includes('lastname')&&!['fullname','contactname','personname'].some(x=>N.includes(x))){const a=N.indexOf('firstname'),b=N.indexOf('lastname');H.push('First + Last name');R.forEach(r=>r.push(((r[a]||'')+' '+(r[b]||'')).trim()))}
    IMPD={type:el('imt').value,H,R};A.impMap()};
   el('imn').onclick=()=>{const f=el('imf').files[0];if(f)fileText(f,go);else if(el('imx').value.trim())go(el('imx').value);else alert('Choose a file or paste CSV text.')}},
@@ -1145,11 +1149,14 @@ Object.assign(A,{
   const svc=r=>get(r,'services').split(/[;,|]/).map(x=>x.trim().toLowerCase()).map(x=>SRV.find(v=>v.toLowerCase()===x)).filter(Boolean);
   const src=r=>{const x=get(r,'source').toLowerCase();return SOURCES.find(v=>v.toLowerCase()===x)||SOURCES.find(v=>x&&(v.toLowerCase().includes(x)||x.includes(v.toLowerCase().split(' ')[0])))||'Unknown'};
   const low=x=>String(x||'').toLowerCase();
+  // Lookup tables for the duplicate check, so a 20,000-row import against
+  // ~10,000 existing leads takes a moment instead of minutes.
+  let LX=null;const leadIndex=()=>{const e=new Map,p=new Map,n=new Map,add=l=>{if(l.email&&!e.has(low(l.email)))e.set(low(l.email),l);const q=normPhone(l.phone).slice(-10);if(q.length>=7&&!p.has(q))p.set(q,l);const k=low(l.company)+'|'+low(l.contact);if(!n.has(k))n.set(k,l)};S.leads.forEach(add);return{e,p,n,add}};
   R.forEach(r=>{let o,ex;
-   if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),website:get(r,'website'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
+   if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}if(!LX)LX=leadIndex();const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),website:get(r,'website'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
     const ph=normPhone(o.phone).slice(-10);
-    ex=S.leads.find(l=>(o.email&&low(l.email)===low(o.email))||(ph.length>=7&&normPhone(l.phone).slice(-10)===ph)||(low(l.company)===low(o.company)&&low(l.contact)===low(o.contact)));
-    if(!ex||mode==='add'){S.leads.unshift({id:uid(),imp:batch,createdAt:new Date().toISOString(),...o});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
+    ex=(o.email&&LX.e.get(low(o.email)))||(ph.length>=7&&LX.p.get(ph))||LX.n.get(low(o.company)+'|'+low(o.contact));
+    if(!ex||mode==='add'){const nl={id:uid(),imp:batch,createdAt:new Date().toISOString(),...o};S.leads.unshift(nl);LX.add(nl);add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
    if(type==='deals'){const nm=get(r,'name')||get(r,'account');if(!nm){skip++;return}const sv=svc(r),st=get(r,'stage'),ls=low(st);const stage=S.cfg.stages.find(x=>low(x)===ls)||(/won/.test(ls)?WON():/lost/.test(ls)?LOST():S.cfg.stages[0]);
     o={name:nm,account:get(r,'account')||nm,email:get(r,'email'),stage,amount:num(get(r,'amount'))||sum(sv),close:dt(get(r,'close')),source:src(r),services:sv,owner:owner(r)};
     ex=S.deals.find(d=>low(d.name)===low(o.name)&&low(d.account)===low(o.account));
