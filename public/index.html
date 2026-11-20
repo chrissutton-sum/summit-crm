@@ -1098,12 +1098,12 @@ Object.assign(A,{
 
 /* ===== v7: import from / export to other CRMs ===== */
 const normH=h=>String(h).toLowerCase().replace(/[^a-z0-9]/g,'');
-const IF={leads:[['company','Company'],['contact','Contact name'],['phone','Phone'],['email','Email'],['source','Lead source'],['disposition','Status'],['value','Monthly value'],['services','Services'],['notes','Notes'],['owner','Owner']],
+const IF={leads:[['company','Company'],['contact','Contact name'],['phone','Phone'],['email','Email'],['website','Website'],['source','Lead source'],['disposition','Status'],['value','Monthly value'],['services','Services'],['notes','Notes'],['owner','Owner']],
  deals:[['name','Deal name'],['account','Client / company'],['email','Email'],['stage','Stage'],['amount','Amount'],['close','Close date'],['source','Source'],['services','Services'],['owner','Owner']],
  clients:[['name','Business name'],['contact','Contact'],['phone','Phone'],['retainer','Monthly retainer'],['renewal','Renewal date'],['status','Status'],['owner','Owner']]};
 const SYN={company:['company','companyname','organization','organizationname','organisation','accountname','account','business','businessname','associatedcompany'],
  contact:['contactname','fullname','personname','firstlastname','contact','leadname','name'],phone:['phone','phonenumber','personphone','mobile','mobilephone','workphone','telephone'],
- email:['email','emailaddress','personemail','workemail'],source:['leadsource','source','dealsource'],disposition:['leadstatus','status','disposition'],value:['monthlyvalue','value','amount'],
+ email:['email','emailaddress','personemail','workemail'],website:['website','websiteurl','listedwebsite','url','web','webaddress','homepage'],source:['leadsource','source','dealsource'],disposition:['leadstatus','status','disposition'],value:['monthlyvalue','value','amount'],
  services:['services','interestedservices','products','product'],notes:['notes','description','note','comments'],owner:['leadowner','dealowner','contactowner','accountowner','owner','assignedto','ownername'],
  'deals.name':['dealname','dealtitle','opportunityname','title','name'],'deals.account':['accountname','associatedcompany','organization','organizationname','company','companyname'],
  'deals.stage':['dealstage','stagename','stage','pipelinestage'],'deals.amount':['amount','dealvalue','value'],'deals.close':['closedate','closingdate','expectedclosedate','dealexpectedclosedate'],
@@ -1146,8 +1146,9 @@ Object.assign(A,{
   const src=r=>{const x=get(r,'source').toLowerCase();return SOURCES.find(v=>v.toLowerCase()===x)||SOURCES.find(v=>x&&(v.toLowerCase().includes(x)||x.includes(v.toLowerCase().split(' ')[0])))||'Unknown'};
   const low=x=>String(x||'').toLowerCase();
   R.forEach(r=>{let o,ex;
-   if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
-    ex=S.leads.find(l=>(o.email&&low(l.email)===low(o.email))||(low(l.company)===low(o.company)&&low(l.contact)===low(o.contact)));
+   if(type==='leads'){const c=get(r,'company')||get(r,'contact');if(!c){skip++;return}const sv=svc(r),dsp=get(r,'disposition');o={company:c,contact:get(r,'contact'),phone:get(r,'phone'),email:get(r,'email'),website:get(r,'website'),source:src(r),disposition:S.cfg.disps.find(d=>low(d)===low(dsp))||S.cfg.disps[0],value:num(get(r,'value'))||sum(sv),services:sv,notes:get(r,'notes'),owner:owner(r)};
+    const ph=normPhone(o.phone).slice(-10);
+    ex=S.leads.find(l=>(o.email&&low(l.email)===low(o.email))||(ph.length>=7&&normPhone(l.phone).slice(-10)===ph)||(low(l.company)===low(o.company)&&low(l.contact)===low(o.contact)));
     if(!ex||mode==='add'){S.leads.unshift({id:uid(),imp:batch,createdAt:new Date().toISOString(),...o});add++}else if(mode==='update'){Object.entries(o).forEach(([k,v])=>{if(v!==''&&!(Array.isArray(v)&&!v.length)&&v!==0)ex[k]=v});upd++}else skip++}
    if(type==='deals'){const nm=get(r,'name')||get(r,'account');if(!nm){skip++;return}const sv=svc(r),st=get(r,'stage'),ls=low(st);const stage=S.cfg.stages.find(x=>low(x)===ls)||(/won/.test(ls)?WON():/lost/.test(ls)?LOST():S.cfg.stages[0]);
     o={name:nm,account:get(r,'account')||nm,email:get(r,'email'),stage,amount:num(get(r,'amount'))||sum(sv),close:dt(get(r,'close')),source:src(r),services:sv,owner:owner(r)};
